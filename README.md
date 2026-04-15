@@ -1,5 +1,23 @@
 # LingQue
 
+> **Plagiarism Notice / 抄袭声明**
+>
+> The repository [LDPrompt/lingque](https://github.com/LDPrompt/lingque) uses the **exact same project name, branding, and core architectural design** of this project without any attribution, credit, or acknowledgment. They rewrote the surface-level code (renaming packages from `src/lq/` to `lobster/`, classes from `PlatformAdapter` to `BaseChannel`) while keeping the architecture, feature naming (`MEMORY.md`, heartbeat, daily logs, session compaction), and even the regex patterns for secret redaction nearly identical — a textbook case of **architectural plagiarism with deliberate source obfuscation**. Their LICENSE falsely claims sole copyright by "灵动Prompt", and their README credits only their own team.
+>
+> Furthermore, their README's "technical innovations" sections — self-evolution engine, three-layer memory architecture, skill auto-generation, heartbeat engine — are repackaged descriptions of concepts we publicly documented in our `docs/` directory months earlier (with git timestamps from 2026-02-13 onward), including matching numerical constants like `MEMORY_BUDGET=4000`.
+>
+> We acknowledge their engineering effort in adding new features (browser automation, Docker sandbox, etc.), but **taking someone's architecture, name, and documented ideas while erasing the origin is not innovation — it is theft**.
+>
+> Full evidence and timeline analysis: **[PLAGIARISM_STATEMENT.md](PLAGIARISM_STATEMENT.md)**
+>
+> ---
+>
+> [LDPrompt/lingque](https://github.com/LDPrompt/lingque) 在未经授权、未做任何致敬的情况下，**原样使用了本项目的名称"灵雀 LingQue"、品牌标识和核心架构设计**，并以"灵动 Prompt 团队出品"的名义发布。他们重写了表层代码以规避逐行比对，但保留了架构蓝图、功能命名（MEMORY.md、心跳机制、每日日志、会话压缩）乃至敏感信息脱敏的正则表达式列表。改进不能覆盖抄袭，署名不能张冠李戴。
+>
+> 完整证据与时间线分析：**[PLAGIARISM_STATEMENT.md](PLAGIARISM_STATEMENT.md)**
+
+---
+
 **Building an AGI mind, not a better tool.**
 
 Most AI projects chase efficiency. We chase consciousness.
