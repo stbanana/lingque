@@ -498,7 +498,7 @@ TOOLS: list[dict] = [
     },
     {
         "name": "vision_analyze",
-        "description": "分析图片内容（基于 zai-mcp-server Vision）。支持本地路径、URL、base64 三种图片源。当用户发送图片或需要理解图片时使用。",
+        "description": "分析图片或视频内容。实际调用的模型由 config.vision 决定（OpenAI 兼容端点：Qwen / GPT-4o / Gemini 等），未配置时回落到 GLM-4V（仅图片）。支持本地路径、URL、base64 三种来源。当用户发送图片/视频或需要理解视觉内容时使用。传入 video_source 时优先走视频通道。",
         "input_schema": {
             "type": "object",
             "properties": {
@@ -506,13 +506,21 @@ TOOLS: list[dict] = [
                     "type": "string",
                     "description": "图片源：本地路径（/path/to/image.png）、URL（https://...）、或 base64 data URI（data:image/png;base64,...）",
                 },
+                "video_source": {
+                    "type": "string",
+                    "description": "视频源（仅 DashScope 配置支持）：本地路径（/path/to/video.mp4）、URL、或 base64 data URI。传入此项时优先做视频理解。",
+                },
                 "prompt": {
                     "type": "string",
-                    "description": "对图片的分析指令，如「描述这张图片」「识别图中的文字」「分析这张图表」",
+                    "description": "分析指令，如「描述这张图片」「识别图中的文字」「视频里发生了什么」",
                     "default": "描述这张图片的内容",
                 },
+                "fps": {
+                    "type": "number",
+                    "description": "视频抽帧频率（每秒抽取多少帧），仅对 video_source 生效。默认 2.0，高速场景可调高，静态/长视频可调低。",
+                    "default": 2.0,
+                },
             },
-            "required": ["image_source"],
         },
     },
     {

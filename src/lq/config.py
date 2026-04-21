@@ -74,6 +74,23 @@ class WechatConfig:
 
 
 @dataclass
+class VisionConfig:
+    """视觉理解模型配置（OpenAI 兼容端点，支持图片+视频）。
+
+    留空时 vision_analyze 工具回落到 api.mcp_key 对应的智谱 GLM-4V（仅图片）。
+    """
+    base_url: str = ""          # e.g. https://dashscope.aliyuncs.com/compatible-mode/v1
+    api_key: str = ""           # 对应 base_url 的 API Key
+    model: str = ""             # e.g. qwen3.6-plus / qwen3.6-flash / gpt-4o
+    fps: float = 2.0            # 视频默认抽帧频率
+    # 附加请求体字段，原样合并进 payload 顶层。用于传递厂商特有的非 OpenAI 标准参数。
+    # e.g. Qwen：{"enable_thinking": false} 关闭默认思考模式
+    #      GLM：{"do_sample": false}
+    # 为空（默认）时不附加任何非标字段，避免严格网关 400。
+    extra_params: dict = field(default_factory=dict)
+
+
+@dataclass
 class VoiceConfig:
     stt_base_url: str = ""      # STT API 地址，如 "https://api.openai.com/v1"
     stt_api_key: str = ""
@@ -103,6 +120,7 @@ class LQConfig:
     discord: DiscordConfig = field(default_factory=DiscordConfig)
     telegram: TelegramConfig = field(default_factory=TelegramConfig)
     wechat: WechatConfig = field(default_factory=WechatConfig)
+    vision: VisionConfig = field(default_factory=VisionConfig)
     voice: VoiceConfig = field(default_factory=VoiceConfig)
     model: str = "glm-5"
     heartbeat_interval: int = 3600  # 秒；<=0 禁用心跳（自主行动循环不会触发）
@@ -196,6 +214,15 @@ class LQConfig:
             owner_chat_id=wc.get("owner_chat_id", ""),
         )
 
+        vis = d.get("vision", {})
+        cfg.vision = VisionConfig(
+            base_url=vis.get("base_url", ""),
+            api_key=vis.get("api_key", ""),
+            model=vis.get("model", ""),
+            fps=float(vis.get("fps", 2.0)),
+            extra_params=dict(vis.get("extra_params", {}) or {}),
+        )
+
         vc = d.get("voice", {})
         cfg.voice = VoiceConfig(
             stt_base_url=vc.get("stt_base_url", ""),
@@ -283,6 +310,15 @@ def load_from_env(env_path: Path) -> LQConfig:
     cfg.discord.bot_token = vals.get("DISCORD_BOT_TOKEN", "")
     cfg.telegram.bot_token = vals.get("TELEGRAM_BOT_TOKEN", "")
     cfg.wechat.bot_token = vals.get("WECHAT_BOT_TOKEN", "")
+
+    cfg.vision.base_url = vals.get("VISION_BASE_URL", "")
+    cfg.vision.api_key = vals.get("VISION_API_KEY", "")
+    cfg.vision.model = vals.get("VISION_MODEL", "")
+    try:
+        cfg.vision.fps = float(vals.get("VISION_FPS", "") or cfg.vision.fps)
+    except ValueError:
+        pass
+    # extra_params 为厂商特有字段，建议直接在 config.json 里维护，env 不支持
 
     cfg.voice.stt_base_url = vals.get("VOICE_STT_BASE_URL", "")
     cfg.voice.stt_api_key = vals.get("VOICE_STT_API_KEY", "")

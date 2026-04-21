@@ -286,9 +286,12 @@ class ToolExecMixin:
                 return await self._tool_browser_action(input_data)
 
             elif name == "vision_analyze":
+                fps_raw = input_data.get("fps")
                 return await self._tool_vision_analyze(
-                    input_data["image_source"],
-                    input_data.get("prompt", "描述这张图片的内容"),
+                    image_source=input_data.get("image_source", ""),
+                    prompt=input_data.get("prompt", "描述这张图片的内容"),
+                    video_source=input_data.get("video_source", ""),
+                    fps=float(fps_raw) if fps_raw is not None else None,
                 )
 
             else:
