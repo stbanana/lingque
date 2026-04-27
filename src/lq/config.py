@@ -140,6 +140,7 @@ class LQConfig:
     show_thinking: bool = False  # 是否输出工具调用记录和思考过程（默认关闭，--show-thinking 开启）
     cc_max_budget_usd: float = 0.5  # Claude Code 单次执行成本上限 (USD)
     browser_port: int = 9222  # Chrome DevTools Protocol 调试端口
+    enabled_tools: list[str] | None = None  # 工具白名单；None=全开，列表=只暴露列表内的工具（覆盖内置+自定义）
 
     def __post_init__(self) -> None:
         if not self.slug:
@@ -170,6 +171,8 @@ class LQConfig:
         cfg.backup_size_threshold = d.get("backup_size_threshold", 524288)
         cfg.show_thinking = d.get("show_thinking", False)
         cfg.cc_max_budget_usd = d.get("cc_max_budget_usd", 0.5)
+        et = d.get("enabled_tools")
+        cfg.enabled_tools = list(et) if isinstance(et, list) else None
         ah = d.get("active_hours", [8, 23])
         cfg.active_hours = (ah[0], ah[1])
 

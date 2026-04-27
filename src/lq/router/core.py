@@ -294,10 +294,18 @@ class MessageRouter(
                 entry["last_error"] = error[:200]
 
     def _build_all_tools(self) -> list[dict]:
-        """合并内置工具和自定义工具的定义列表。"""
+        """合并内置工具和自定义工具的定义列表。
+
+        若 config.enabled_tools 是列表，按白名单过滤（同时管内置和自定义）；
+        None 时保持全开。表单/客服等窄场景白名单可大幅减少 prefill token。
+        """
         all_tools = list(TOOLS)
         if self.tool_registry:
             all_tools.extend(self.tool_registry.get_definitions())
+        whitelist = getattr(self.config, "enabled_tools", None) if self.config else None
+        if isinstance(whitelist, list):
+            allowed = set(whitelist)
+            all_tools = [t for t in all_tools if t.get("name") in allowed]
         return all_tools
 
     @staticmethod
