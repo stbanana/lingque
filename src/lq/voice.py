@@ -7,6 +7,7 @@ import logging
 import os
 import subprocess
 import tempfile
+import time
 from typing import TYPE_CHECKING
 
 import httpx
@@ -211,8 +212,11 @@ class VoiceService:
         if not self.stt_enabled:
             raise RuntimeError("STT 未配置")
 
+        audio_in_size = len(audio_data)
+        _t_conv0 = time.perf_counter()
         # 自动转换不兼容的格式（如微信 Silk → OGG/Opus）
         audio_data, mime_type = _ensure_whisper_compatible(audio_data, mime_type)
+        _t_conv1 = time.perf_counter()
 
         ext = _MIME_EXT.get(mime_type, ".ogg")
         upload_filename = filename or f"audio{ext}"
@@ -220,9 +224,15 @@ class VoiceService:
         url = f"{self._stt_base_url}/audio/transcriptions"
         headers = {"Authorization": f"Bearer {self._stt_api_key}"}
 
+        logger.info(
+            "STT 请求发出: bytes_in=%d bytes_out=%d mime=%s convert=%.2fs",
+            audio_in_size, len(audio_data), mime_type, _t_conv1 - _t_conv0,
+        )
+
         last_exc: Exception | None = None
         for attempt in range(_MAX_RETRIES + 1):
             try:
+                _t_post0 = time.perf_counter()
                 async with httpx.AsyncClient(timeout=_TIMEOUT) as client:
                     resp = await client.post(
                         url,
@@ -235,6 +245,7 @@ class VoiceService:
                             }.items() if v
                         },
                     )
+                _t_post1 = time.perf_counter()
                 if resp.status_code in _RETRYABLE_STATUS and attempt < _MAX_RETRIES:
                     delay = _BASE_DELAY * (2 ** attempt)
                     logger.warning(
@@ -245,7 +256,12 @@ class VoiceService:
                     continue
                 resp.raise_for_status()
                 data = resp.json()
-                return data.get("text", "")
+                text = data.get("text", "")
+                logger.info(
+                    "STT 完成: post=%.2fs status=%d text_len=%d",
+                    _t_post1 - _t_post0, resp.status_code, len(text),
+                )
+                return text
             except httpx.HTTPStatusError:
                 raise
             except Exception as e:

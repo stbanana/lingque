@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import time
 from typing import Any
 
 import re
@@ -593,7 +594,20 @@ class OpenAIExecutor:
         }
         if system:
             kwargs["instructions"] = system
+        n_imgs = sum(
+            1
+            for it in input_items
+            if isinstance(it.get("content"), list)
+            for p in it["content"]
+            if isinstance(p, dict) and p.get("type") == "input_image"
+        )
+        logger.info(
+            "API 请求发出 (responses): n_inputs=%d n_images=%d n_tools=%d",
+            len(input_items), n_imgs, len(resp_tools),
+        )
+        _t_send = time.perf_counter()
         resp = await _retry_openai_call(self.client.responses.create, **kwargs)
+        _t_recv = time.perf_counter()
         self._record_usage(resp, "reply_with_tools")
 
         text_parts: list[str] = []
@@ -617,8 +631,10 @@ class OpenAIExecutor:
 
         combined_text = _clean_output("\n".join(text_parts))
         status = getattr(resp, "status", "completed")
-        logger.info("API 返回 (responses): status=%s text_len=%d tools=%d preview=%s",
-                    status, len(combined_text), len(pending_tools), combined_text[:150])
+        logger.info(
+            "API 返回 (responses): status=%s text_len=%d tools=%d roundtrip=%.2fs preview=%s",
+            status, len(combined_text), len(pending_tools), _t_recv - _t_send, combined_text[:150],
+        )
 
         if not pending_tools:
             return ToolResponse(
@@ -637,18 +653,34 @@ class OpenAIExecutor:
     ) -> ToolResponse:
         oai_msgs = _messages_to_chat(system, messages)
         oai_tools = _tools_to_chat(tools)
+        n_msgs = len(oai_msgs)
+        n_imgs = sum(
+            1
+            for m in oai_msgs
+            if isinstance(m.get("content"), list)
+            for p in m["content"]
+            if isinstance(p, dict) and p.get("type") == "image_url"
+        )
+        logger.info(
+            "API 请求发出 (chat): n_messages=%d n_images=%d n_tools=%d",
+            n_msgs, n_imgs, len(oai_tools),
+        )
+        _t_send = time.perf_counter()
         resp = await _retry_openai_call(
             self.client.chat.completions.create,
             model=self.model, max_tokens=max_tokens,
             messages=oai_msgs, tools=oai_tools,
         )
+        _t_recv = time.perf_counter()
         self._record_usage(resp, "reply_with_tools")
 
         choice = resp.choices[0]
         message = choice.message
         combined_text = _clean_output(message.content or "")
-        logger.info("API 返回 (chat): finish_reason=%s text_len=%d preview=%s",
-                    choice.finish_reason, len(combined_text), combined_text[:150])
+        logger.info(
+            "API 返回 (chat): finish_reason=%s text_len=%d roundtrip=%.2fs preview=%s",
+            choice.finish_reason, len(combined_text), _t_recv - _t_send, combined_text[:150],
+        )
 
         pending_tools: list[dict] = []
         if message.tool_calls:

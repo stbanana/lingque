@@ -503,18 +503,29 @@ class ToolExecMixin:
         import base64 as _b64
 
         key = msg.audio_keys[0]
+        _t_dl0 = time.perf_counter()
         result = await self.adapter.fetch_media(msg.message_id, key)
+        _t_dl1 = time.perf_counter()
         if not result:
             logger.warning("语音下载失败: msg=%s key=%s", msg.message_id, key[:40])
             return ""
 
         b64_data, mime_type = result
         audio_bytes = _b64.b64decode(b64_data)
+        logger.info(
+            "语音下载完成: bytes=%d mime=%s download=%.2fs",
+            len(audio_bytes), mime_type, _t_dl1 - _t_dl0,
+        )
 
         try:
+            _t_stt0 = time.perf_counter()
             text = await self.voice.transcribe(audio_bytes, mime_type)
+            _t_stt1 = time.perf_counter()
             if text:
-                logger.info("语音转文字成功: %s", text[:80])
+                logger.info(
+                    "语音转文字成功: stt_total=%.2fs text=%s",
+                    _t_stt1 - _t_stt0, text[:80],
+                )
                 return f"[语音转文字] {text}"
         except Exception:
             logger.exception("语音转文字失败")
