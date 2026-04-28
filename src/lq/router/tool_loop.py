@@ -140,6 +140,9 @@ class ToolLoopMixin:
                             target = tc["input"].get("chat_id", "")
                             if not target or target == chat_id:
                                 sent_to_current_chat = True
+                        elif result.get("_chat_already_replied"):
+                            # 自定义工具内部已直接回复当前 chat（如 parse_form 镜像 agent_message）
+                            sent_to_current_chat = True
                     result_str = json.dumps(result, ensure_ascii=False)
                     tool_results.append({
                         "tool_use_id": tc["id"],
