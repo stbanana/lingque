@@ -40,6 +40,20 @@ class ToolExecMixin:
 
     async def _execute_tool(self, name: str, input_data: dict, chat_id: str) -> dict:
         """执行单个工具调用"""
+        # 早期守卫：LLM 偶发会发出名字为空的 tool_call（schema 不合规的输出）。
+        # 不进入 if/elif 链，直接返回错误，让 LLM 下一回合换有效工具名重试。
+        if not name or not isinstance(name, str):
+            logger.warning(
+                "工具调用收到空/无效名: %r input=%s — 返回错误让 LLM 重试",
+                name, json.dumps(input_data, ensure_ascii=False)[:100],
+            )
+            return {
+                "success": False,
+                "error": (
+                    "tool_call had empty/invalid name — please re-emit "
+                    "with a valid tool name from the available tools."
+                ),
+            }
         logger.info("执行工具: %s(%s)", name, json.dumps(input_data, ensure_ascii=False)[:100])
 
         try:
