@@ -132,6 +132,7 @@ class ToolLoopMixin:
                         result.get("error", ""),
                     )
                     # 标记是否已通过 send_message/send_card 向当前 chat 发送过
+                    # （自定义工具不应再代替 LLM 说话；说话由 final text 走 _send_reply）
                     if result.get("success"):
                         if tc["name"] == "send_card":
                             # send_card 始终发到当前会话
@@ -140,9 +141,6 @@ class ToolLoopMixin:
                             target = tc["input"].get("chat_id", "")
                             if not target or target == chat_id:
                                 sent_to_current_chat = True
-                        elif result.get("_chat_already_replied"):
-                            # 自定义工具内部已直接回复当前 chat（如 parse_form 镜像 agent_message）
-                            sent_to_current_chat = True
                     result_str = json.dumps(result, ensure_ascii=False)
                     tool_results.append({
                         "tool_use_id": tc["id"],
@@ -270,6 +268,11 @@ class ToolLoopMixin:
                     logger.exception("PostProcessor failed")
 
         self._reply_cooldown_ts[chat_id] = time.time()
+        # 暴露本轮调用过的工具列表给 on_reply 钩子（去重保留顺序）
+        seen: set[str] = set()
+        self._last_turn_tools[chat_id] = [
+            t for t in tools_called if not (t in seen or seen.add(t))
+        ]
         return resp.text
 
     async def _send_tool_notification(

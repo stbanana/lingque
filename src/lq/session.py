@@ -459,6 +459,25 @@ class SessionManager:
             active_path.unlink()
         del self._sessions[chat_id]
 
+    def reset(self, chat_id: str) -> bool:
+        """彻底清空指定 chat 的会话上下文：内存 + 文件一并删除。
+
+        用于跨业务 session 切换时（例如 parse_form 启动新表单），
+        避免上一轮的 chat 历史/工具调用历史污染新一轮 LLM 上下文。
+        归档需求请用 archive() —— reset 是无追溯的硬删除。
+        """
+        existed = False
+        if chat_id in self._sessions:
+            del self._sessions[chat_id]
+            existed = True
+        active_path = self._session_path(chat_id)
+        if active_path.exists():
+            active_path.unlink()
+            existed = True
+        if existed:
+            logger.info("会话已重置（内存+文件硬删除）: chat=%s", chat_id[-8:] if len(chat_id) >= 8 else chat_id)
+        return existed
+
     def get_stats(self) -> dict:
         """返回所有会话的统计信息"""
         stats = {}

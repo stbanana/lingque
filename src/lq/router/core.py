@@ -99,6 +99,8 @@ class MessageRouter(
         self._addressed_topics: dict[str, OrderedDict[str, None]] = {}
         # 工具调用统计（per-tool success/fail）
         self._tool_stats: dict[str, dict[str, int]] = {}
+        # 本轮 LLM 调用过的工具名（去重，按调用顺序），on_reply 钩子读取
+        self._last_turn_tools: dict[str, list[str]] = {}
         # 注入依赖
         self.session_mgr: Any = None
         self.calendar: Any = None
