@@ -40,6 +40,12 @@ class APIConfig:
     proxy: str = ""  # HTTP/SOCKS 代理（如 socks5://127.0.0.1:1080）
     mcp_key: str = ""  # 智谱 MCP API Key（联网搜索等），默认复用 api_key
     api_format: str = "anthropic"  # API 格式: "anthropic" | "openai" | "responses"
+    # 透传给每次 LLM API 调用的 extra_body —— 用于供应商特有参数，比如：
+    #   Qwen / Doubao / GLM-Plus: {"enable_thinking": false} 关推理省 token
+    #   DeepSeek-R1 / o-series:    {"reasoning_effort": "low"}
+    #   Anthropic:                 {"thinking": {"type": "enabled", "budget_tokens": 5000}}
+    # 不解读不翻译，原样合并进 SDK 的 extra_body 参数。
+    extra_body: dict = field(default_factory=dict)
 
 
 @dataclass
@@ -184,6 +190,7 @@ class LQConfig:
             proxy=api.get("proxy", ""),
             mcp_key=api.get("mcp_key", "") or api_key,
             api_format=api.get("api_format", "anthropic"),
+            extra_body=dict(api.get("extra_body", {}) or {}),
         )
 
         fs = d.get("feishu", {})
@@ -308,6 +315,15 @@ def load_from_env(env_path: Path) -> LQConfig:
         or ""
     )
     cfg.api.mcp_key = vals.get("ZHIPU_API_KEY", "") or cfg.api.api_key
+    # API_EXTRA_BODY 是 JSON 字符串，原样合并进 SDK 的 extra_body
+    raw_extra = (vals.get("API_EXTRA_BODY", "") or "").strip()
+    if raw_extra:
+        try:
+            parsed = json.loads(raw_extra)
+            if isinstance(parsed, dict):
+                cfg.api.extra_body = parsed
+        except json.JSONDecodeError as e:
+            logger.warning("API_EXTRA_BODY JSON 解析失败，已忽略: %s", e)
     cfg.feishu.app_id = vals.get("FEISHU_APP_ID", "")
     cfg.feishu.app_secret = vals.get("FEISHU_APP_SECRET", "")
     cfg.discord.bot_token = vals.get("DISCORD_BOT_TOKEN", "")

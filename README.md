@@ -161,6 +161,7 @@ ANTHROPIC_AUTH_TOKEN=xxxxx
 # OPENAI_API_KEY=sk-xxxxx
 # GEMINI_API_KEY=xxxxx
 API_FORMAT=anthropic  # "anthropic" | "openai" | "responses"
+# API_EXTRA_BODY='{"thinking":{"type":"disabled"}}'  # JSON string, passed straight through to SDK extra_body on every LLM call
 
 # Optional — only needed for the adapters you use
 FEISHU_APP_ID=cli_xxxxx
@@ -770,7 +771,8 @@ Edit `~/.lq-{slug}/config.json`:
     "base_url": "https://your-provider.com/api/anthropic",
     "api_key": "xxxxx",
     "proxy": "http://127.0.0.1:7890",
-    "api_format": "anthropic"
+    "api_format": "anthropic",
+    "extra_body": {}
   },
   "feishu": {
     "app_id": "cli_xxxxx",
@@ -826,6 +828,7 @@ Edit `~/.lq-{slug}/config.json`:
 | `api.base_url` | LLM API endpoint |
 | `api.api_format` | API format: `anthropic` (default), `openai` (Chat Completions), or `responses` (OpenAI Responses API) |
 | `api.proxy` | HTTP proxy (used by both httpx and discord.py) |
+| `api.extra_body` | Vendor-specific request fields, passed straight through to the SDK's `extra_body` on every LLM call. Examples: `{"thinking": {"type": "disabled"}}` (Doubao / Anthropic-style off-switch), `{"enable_thinking": false}` (Qwen3 / GLM-Plus), `{"reasoning_effort": "low"}` (DeepSeek-R1 / o-series). LingQue does not interpret or translate the contents — write whatever your provider expects |
 | `feishu.app_id` / `app_secret` | Feishu app credentials |
 | `discord.bot_token` | Discord bot token (`bot_id` is auto-populated on first start) |
 | `discord.owner_user_id` | Your Discord User ID — adapter resolves it to a DM channel at connect time so autonomous / heartbeat / morning-report messages can DM you. Requires the bot to share a guild with you. Leave empty to disable outbound DM |

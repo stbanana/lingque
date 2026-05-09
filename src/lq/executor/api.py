@@ -155,6 +155,14 @@ class DirectAPIExecutor:
             default_headers={"Authorization": ""},
         )
         self.stats: Any = None
+        # 透传给 SDK 的 extra_body（供应商特有字段，如 thinking/reasoning_effort 等）
+        self._extra_body: dict = dict(api_config.extra_body or {})
+        if self._extra_body:
+            logger.info("API extra_body 生效: keys=%s", list(self._extra_body.keys()))
+
+    def _extra_kwargs(self) -> dict:
+        """返回要 spread 进 messages.create 的 kwargs；空 dict 时不传。"""
+        return {"extra_body": self._extra_body} if self._extra_body else {}
 
     def _record_usage(self, resp: Any, call_type: str) -> None:
         if self.stats and hasattr(resp, "usage"):
@@ -176,6 +184,7 @@ class DirectAPIExecutor:
             max_tokens=4096,
             system=system,
             messages=[{"role": "user", "content": user_message}],
+            **self._extra_kwargs(),
         )
         self._record_usage(resp, "reply")
         text = _clean_output(_extract_text(resp.content))
@@ -191,6 +200,7 @@ class DirectAPIExecutor:
             max_tokens=max_tokens,
             system=system,
             messages=messages,
+            **self._extra_kwargs(),
         )
         self._record_usage(resp, "reply_with_history")
         return _clean_output(_extract_text(resp.content))
@@ -201,6 +211,7 @@ class DirectAPIExecutor:
             model=self.model,
             max_tokens=256,
             messages=[{"role": "user", "content": prompt}],
+            **self._extra_kwargs(),
         )
         self._record_usage(resp, "quick_judge")
         return _clean_output(_extract_text(resp.content))
@@ -219,6 +230,7 @@ class DirectAPIExecutor:
             system=system,
             messages=msgs,
             tools=tools,
+            **self._extra_kwargs(),
         )
         self._record_usage(resp, "reply_with_tools")
 
@@ -480,6 +492,17 @@ class OpenAIExecutor:
             base_url=api_config.base_url,
         )
         self.stats: Any = None
+        # 透传给 SDK 的 extra_body（供应商特有字段）
+        self._extra_body: dict = dict(api_config.extra_body or {})
+        if self._extra_body:
+            logger.info(
+                "API extra_body 生效 (%s): keys=%s",
+                api_format, list(self._extra_body.keys()),
+            )
+
+    def _extra_kwargs(self) -> dict:
+        """返回要 spread 进 SDK create() 的 kwargs；空 dict 时不传。"""
+        return {"extra_body": self._extra_body} if self._extra_body else {}
 
     def _record_usage(self, resp: Any, call_type: str) -> None:
         if not self.stats:
@@ -508,6 +531,7 @@ class OpenAIExecutor:
                 "model": self.model,
                 "input": user_message,
                 "max_output_tokens": 4096,
+                **self._extra_kwargs(),
             }
             if system:
                 kwargs["instructions"] = system
@@ -522,6 +546,7 @@ class OpenAIExecutor:
         resp = await _retry_openai_call(
             self.client.chat.completions.create,
             model=self.model, max_tokens=4096, messages=msgs,
+            **self._extra_kwargs(),
         )
         self._record_usage(resp, "reply")
         return _clean_output(resp.choices[0].message.content or "")
@@ -537,6 +562,7 @@ class OpenAIExecutor:
                 "model": self.model,
                 "input": input_items,
                 "max_output_tokens": max_tokens,
+                **self._extra_kwargs(),
             }
             if system:
                 kwargs["instructions"] = system
@@ -548,6 +574,7 @@ class OpenAIExecutor:
         resp = await _retry_openai_call(
             self.client.chat.completions.create,
             model=self.model, max_tokens=max_tokens, messages=oai_msgs,
+            **self._extra_kwargs(),
         )
         self._record_usage(resp, "reply_with_history")
         return _clean_output(resp.choices[0].message.content or "")
@@ -559,6 +586,7 @@ class OpenAIExecutor:
             resp = await _retry_openai_call(
                 self.client.responses.create,
                 model=self.model, input=prompt, max_output_tokens=256,
+                **self._extra_kwargs(),
             )
             self._record_usage(resp, "quick_judge")
             return _clean_output(resp.output_text or "")
@@ -567,6 +595,7 @@ class OpenAIExecutor:
             self.client.chat.completions.create,
             model=self.model, max_tokens=256,
             messages=[{"role": "user", "content": prompt}],
+            **self._extra_kwargs(),
         )
         self._record_usage(resp, "quick_judge")
         return _clean_output(resp.choices[0].message.content or "")
@@ -591,6 +620,7 @@ class OpenAIExecutor:
             "input": input_items,
             "tools": resp_tools,
             "max_output_tokens": max_tokens,
+            **self._extra_kwargs(),
         }
         if system:
             kwargs["instructions"] = system
@@ -670,6 +700,7 @@ class OpenAIExecutor:
             self.client.chat.completions.create,
             model=self.model, max_tokens=max_tokens,
             messages=oai_msgs, tools=oai_tools,
+            **self._extra_kwargs(),
         )
         _t_recv = time.perf_counter()
         self._record_usage(resp, "reply_with_tools")
