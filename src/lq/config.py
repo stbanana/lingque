@@ -285,7 +285,7 @@ def find_instance(identifier: str) -> tuple[Path, LQConfig] | None:
         if not config_path.exists():
             continue
         try:
-            with open(config_path) as f:
+            with open(config_path, encoding="utf-8") as f:
                 cfg = LQConfig.from_dict(json.load(f))
         except (json.JSONDecodeError, KeyError):
             continue
@@ -298,13 +298,13 @@ def load_config(home: Path) -> LQConfig:
     config_path = home / "config.json"
     if not config_path.exists():
         raise FileNotFoundError(f"配置文件不存在: {config_path}")
-    with open(config_path) as f:
+    with open(config_path, encoding="utf-8") as f:
         return LQConfig.from_dict(json.load(f))
 
 
 def save_config(home: Path, config: LQConfig) -> None:
     config_path = home / "config.json"
-    with open(config_path, "w") as f:
+    with open(config_path, "w", encoding="utf-8") as f:
         json.dump(config.to_dict(), f, ensure_ascii=False, indent=2)
 
 
