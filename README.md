@@ -169,6 +169,8 @@ FEISHU_APP_SECRET=xxxxx
 DISCORD_BOT_TOKEN=xxxxx
 TELEGRAM_BOT_TOKEN=xxxxx
 WECHAT_BOT_TOKEN=xxxxx  # (optional — auto-saved after QR login)
+WECOM_BOT_ID=aibxxxxx
+WECOM_SECRET=xxxxx
 
 # Optional — Voice STT/TTS (OpenAI-compatible endpoints)
 VOICE_STT_BASE_URL=https://api.openai.com/v1
@@ -287,7 +289,10 @@ uv run lq stop @奶油            # stop
 
 ## Platform Adapter Setup
 
-LingQue supports four platform adapters. You can use any combination simultaneously via `--adapter`.
+LingQue supports five platform adapters. You can use any combination simultaneously via `--adapter`.
+
+> **Note:** `.env` credentials are only read during `uv run lq init --name NAME --from-env .env`.
+> Platform-specific adapter IDs/secrets/tokens must be present in `.env` **before** creating the instance.
 
 ### Local (terminal)
 
@@ -365,6 +370,27 @@ In Telegram, DM the bot or @mention it in a group to chat.
 5. Features: text messaging, "typing..." indicator support
 
 DM the bot's WeChat account to chat. All conversations are private (1:1).
+
+### WeCom (Enterprise WeChat)
+
+The WeCom adapter uses the **WeCom AI Bot** WebSocket long-connection protocol — no public IP or server required.
+
+1. In the WeCom admin console, create an API-mode bot (usually under **Security & Management → Management Tools → Create Bot**), obtain the Bot ID and Secret. See the [official guide](https://open.work.weixin.qq.com/help2/pc/21704).
+2. Add credentials to `.env`:
+   ```
+   WECOM_BOT_ID=aibXXXXXXXXXXXXXXXXXXXXXXXX
+   WECOM_SECRET=XXXXXXXXXXXXXXXXXXXXXXXXXXXX
+   ```
+3. Start with `--adapter wecom`:
+   ```bash
+   uv run lq start @NAME --adapter wecom
+   ```
+4. Add the bot to a WeCom group chat.
+5. @mention the bot in the group to start a conversation.
+
+The bot only responds to @-mentioned messages (required by the WeCom AI Bot protocol). Replies are in Markdown format. Disconnections trigger automatic reconnection.
+
+> Rich media messages are not yet supported (TODO).
 
 ### Voice Recognition & Synthesis (语音识别与合成)
 

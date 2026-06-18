@@ -162,6 +162,8 @@ FEISHU_APP_SECRET=xxxxx
 DISCORD_BOT_TOKEN=xxxxx
 TELEGRAM_BOT_TOKEN=xxxxx
 WECHAT_BOT_TOKEN=xxxxx  # （可选 — QR 登录后自动保存）
+WECOM_BOT_ID=aibxxxxx 
+WECOM_SECRET=xxxxx
 ```
 
 ### 初始化实例
@@ -267,7 +269,13 @@ uv run lq stop @奶油            # 停止
 
 ## 平台适配器配置
 
-灵雀支持四个平台适配器，可通过 `--adapter` 任意组合使用。
+灵雀支持五个平台适配器，可通过 `--adapter` 任意组合使用。
+
+> 注意，仅在 `uv run lq init --name 奶油 --from-env .env` 时
+>
+> 读取 .env 配置并绑定给人格
+>
+> 所以涉及到特定平台的适配器 ID/SECRET/TOKEN 应当先编辑 .env 再创建人格
 
 ### 本地终端
 
@@ -345,6 +353,27 @@ uv run lq stop @奶油            # 停止
 5. 支持文本消息和"正在输入..."状态
 
 私聊 bot 的微信账号即可对话。所有对话均为私聊（1:1）。
+
+### 企业微信
+
+企业微信适配器基于**企业微信 AI 机器人**的 WebSocket 长连接协议，无需公网 IP 和服务器。
+
+1. 在企业微信管理后台创建 API模式机器人（通常在**安全与管理**-**管理工具**-**创建机器人**），获取 Bot ID 和 Secret，可见[官方教程](https://open.work.weixin.qq.com/help2/pc/21704)
+2. 将凭证添加到 `.env`：
+   ```
+   WECOM_BOT_ID=aibXXXXXXXXXXXXXXXXXXXXXXXX
+   WECOM_SECRET=XXXXXXXXXXXXXXXXXXXXXXXXXXXX
+   ```
+3. 使用 `--adapter wecom` 启动：
+   ```bash
+   uv run lq start @实例名 --adapter wecom
+   ```
+4. 将机器人添加到企业微信群聊
+5. 在群聊中 @机器人名称 发送消息即可触发对话
+
+机器人只响应被 @ 的消息（企业微信 AI 机器人协议规定），回复格式为 Markdown。连接断开后自动重连。
+
+> 暂不支持富媒体消息（TODO）
 
 ---
 
