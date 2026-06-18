@@ -119,10 +119,9 @@ class WecomAdapter(PlatformAdapter):
     - 断线自动重连（指数退避）
     """
 
-    def __init__(self, bot_id: str, secret: str, bot_name: str = "") -> None:
+    def __init__(self, bot_id: str, secret: str) -> None:
         self._bot_id = bot_id
         self._secret = secret
-        self._bot_name = bot_name
         self._queue: asyncio.Queue | None = None
         self._ws = None
         self._tasks: list[asyncio.Task] = []
@@ -145,7 +144,7 @@ class WecomAdapter(PlatformAdapter):
             return self._identity
         self._identity = BotIdentity(
             bot_id=self._bot_id,
-            bot_name=self._bot_name or "企业微信机器人",
+            bot_name="",
         )
         return self._identity
 

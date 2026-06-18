@@ -331,7 +331,6 @@ class AssistantGateway:
             wecom_adapter = WecomAdapter(
                 bot_id=self.config.wecom.bot_id,
                 secret=self.config.wecom.secret,
-                bot_name=self.config.wecom.bot_name or self.config.name,
             )
             identity = await wecom_adapter.get_identity()
             logger.info("企业微信适配器: bot_id=%s", identity.bot_id)

@@ -83,7 +83,6 @@ class WechatConfig:
 class WecomConfig:
     bot_id: str = ""          # 企业微信 AI 机器人 BotID
     secret: str = ""          # 长连接专用密钥 Secret
-    bot_name: str = ""        # 机器人在群内显示名（用于剥离 @提及）
     owner_chat_id: str = ""   # 主人的 userid
 
 
@@ -237,7 +236,6 @@ class LQConfig:
         cfg.wecom = WecomConfig(
             bot_id=wce.get("bot_id", ""),
             secret=wce.get("secret", ""),
-            bot_name=wce.get("bot_name", ""),
             owner_chat_id=wce.get("owner_chat_id", ""),
         )
 
@@ -348,7 +346,6 @@ def load_from_env(env_path: Path) -> LQConfig:
     cfg.wechat.bot_token = vals.get("WECHAT_BOT_TOKEN", "")
     cfg.wecom.bot_id = vals.get("WECOM_BOT_ID", "")
     cfg.wecom.secret = vals.get("WECOM_SECRET", "")
-    cfg.wecom.bot_name = vals.get("WECOM_BOT_NAME", "")
 
     cfg.vision.base_url = vals.get("VISION_BASE_URL", "")
     cfg.vision.api_key = vals.get("VISION_API_KEY", "")
