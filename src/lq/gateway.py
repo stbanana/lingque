@@ -36,7 +36,7 @@ from lq.tools import ToolRegistry
 logger = logging.getLogger(__name__)
 
 
-KNOWN_ADAPTERS = {"feishu", "local", "discord", "telegram", "wechat"}
+KNOWN_ADAPTERS = {"feishu", "local", "discord", "telegram", "wechat", "wecom"}
 
 
 class AssistantGateway:
@@ -172,6 +172,7 @@ class AssistantGateway:
         has_discord = "discord" in self.adapter_types
         has_telegram = "telegram" in self.adapter_types
         has_wechat = "wechat" in self.adapter_types
+        has_wecom = "wecom" in self.adapter_types
 
         # 凭证校验 + 提醒
         if has_feishu:
@@ -316,6 +317,29 @@ class AssistantGateway:
             adapters.append(wechat_adapter)
             if primary is None:
                 primary = wechat_adapter
+
+        if has_wecom:
+            if not self.config.wecom.bot_id or not self.config.wecom.secret:
+                if len(self.adapter_types) > 1:
+                    logger.warning("企业微信凭证未配置，跳过企业微信适配器")
+                    self.adapter_types = [t for t in self.adapter_types if t != "wecom"]
+                    has_wecom = False
+                else:
+                    raise RuntimeError("企业微信凭证未配置（WECOM_BOT_ID / WECOM_SECRET 为空）")
+        if has_wecom:
+            from lq.wecom.adapter import WecomAdapter
+            wecom_adapter = WecomAdapter(
+                bot_id=self.config.wecom.bot_id,
+                secret=self.config.wecom.secret,
+                bot_name=self.config.wecom.bot_name or self.config.name,
+            )
+            identity = await wecom_adapter.get_identity()
+            logger.info("企业微信适配器: bot_id=%s", identity.bot_id)
+            adapters.append(wecom_adapter)
+            if primary is None:
+                bot_open_id = identity.bot_id
+                bot_name = identity.bot_name or self.config.name
+                primary = wecom_adapter
 
         if not adapters:
             raise RuntimeError("没有可用的适配器，无法启动")
@@ -1302,8 +1326,13 @@ class AssistantGateway:
 
     def _setup_signals(self) -> None:
         loop = asyncio.get_running_loop()
-        for sig in (signal.SIGTERM, signal.SIGINT):
-            loop.add_signal_handler(sig, self._handle_signal, sig)
+        try:
+            for sig in (signal.SIGTERM, signal.SIGINT):
+                loop.add_signal_handler(sig, self._handle_signal, sig)
+        except NotImplementedError:
+            # Windows 不支持 add_signal_handler，改用 signal.signal
+            for sig in (signal.SIGTERM, signal.SIGINT):
+                signal.signal(sig, lambda s, _: self._handle_signal(signal.Signals(s)))
 
     def _handle_signal(self, sig: signal.Signals) -> None:
         logger.info("收到信号 %s，正在关闭...", sig.name)

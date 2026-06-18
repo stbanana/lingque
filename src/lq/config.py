@@ -80,6 +80,14 @@ class WechatConfig:
 
 
 @dataclass
+class WecomConfig:
+    bot_id: str = ""          # 企业微信 AI 机器人 BotID
+    secret: str = ""          # 长连接专用密钥 Secret
+    bot_name: str = ""        # 机器人在群内显示名（用于剥离 @提及）
+    owner_chat_id: str = ""   # 主人的 userid
+
+
+@dataclass
 class VisionConfig:
     """视觉理解模型配置（OpenAI 兼容端点，支持图片+视频）。
 
@@ -126,6 +134,7 @@ class LQConfig:
     discord: DiscordConfig = field(default_factory=DiscordConfig)
     telegram: TelegramConfig = field(default_factory=TelegramConfig)
     wechat: WechatConfig = field(default_factory=WechatConfig)
+    wecom: WecomConfig = field(default_factory=WecomConfig)
     vision: VisionConfig = field(default_factory=VisionConfig)
     voice: VoiceConfig = field(default_factory=VoiceConfig)
     model: str = "glm-5"
@@ -222,6 +231,14 @@ class LQConfig:
             bot_id=wc.get("bot_id", ""),
             base_url=wc.get("base_url", ""),
             owner_chat_id=wc.get("owner_chat_id", ""),
+        )
+
+        wce = d.get("wecom", {})
+        cfg.wecom = WecomConfig(
+            bot_id=wce.get("bot_id", ""),
+            secret=wce.get("secret", ""),
+            bot_name=wce.get("bot_name", ""),
+            owner_chat_id=wce.get("owner_chat_id", ""),
         )
 
         vis = d.get("vision", {})
@@ -329,6 +346,9 @@ def load_from_env(env_path: Path) -> LQConfig:
     cfg.discord.bot_token = vals.get("DISCORD_BOT_TOKEN", "")
     cfg.telegram.bot_token = vals.get("TELEGRAM_BOT_TOKEN", "")
     cfg.wechat.bot_token = vals.get("WECHAT_BOT_TOKEN", "")
+    cfg.wecom.bot_id = vals.get("WECOM_BOT_ID", "")
+    cfg.wecom.secret = vals.get("WECOM_SECRET", "")
+    cfg.wecom.bot_name = vals.get("WECOM_BOT_NAME", "")
 
     cfg.vision.base_url = vals.get("VISION_BASE_URL", "")
     cfg.vision.api_key = vals.get("VISION_API_KEY", "")
