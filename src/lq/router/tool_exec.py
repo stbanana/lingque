@@ -11,28 +11,13 @@ from typing import Any
 from lq.platform import IncomingMessage, OutgoingMessage
 from lq.prompts import (
     RESULT_GLOBAL_MEMORY_WRITTEN, RESULT_CHAT_MEMORY_WRITTEN,
-    RESULT_CARD_SENT, RESULT_FILE_EMPTY, RESULT_FILE_UPDATED,
-    RESULT_SEND_FAILED, RESULT_SCHEDULE_OK,
-    ERR_CALENDAR_NOT_LOADED, ERR_TOOL_REGISTRY_NOT_LOADED,
+    RESULT_FILE_EMPTY, RESULT_FILE_UPDATED,
+    ERR_TOOL_REGISTRY_NOT_LOADED,
     ERR_CC_NOT_LOADED, ERR_BASH_NOT_LOADED, ERR_UNKNOWN_TOOL,
-    ERR_TIME_FORMAT_INVALID, ERR_TIME_PAST, ERR_CODE_VALIDATION_OK,
-    SCHEDULED_ACTION_PROMPT,
+    ERR_CODE_VALIDATION_OK,
 )
 
 logger = logging.getLogger(__name__)
-
-
-def _is_valid_chat_id(chat_id: str) -> bool:
-    """检查 chat_id 是否为有效的平台 ID（飞书或 Discord）"""
-    if not chat_id:
-        return False
-    # 飞书: oc_/ou_/on_ 开头且长度 >= 20
-    if chat_id.startswith(("oc_", "ou_", "on_")) and len(chat_id) >= 20:
-        return True
-    # Discord: 纯数字 snowflake ID，通常 17-20 位
-    if chat_id.isdigit() and len(chat_id) >= 10:
-        return True
-    return False
 
 
 class ToolExecMixin:
@@ -71,36 +56,6 @@ class ToolExecMixin:
                     input_data["content"],
                 )
                 return {"success": True, "message": RESULT_CHAT_MEMORY_WRITTEN}
-
-            elif name == "calendar_create_event":
-                if not self.calendar:
-                    return {"success": False, "error": ERR_CALENDAR_NOT_LOADED}
-                result = await self.calendar.create_event(
-                    summary=input_data["summary"],
-                    start_time=input_data["start_time"],
-                    end_time=input_data["end_time"],
-                    description=input_data.get("description", ""),
-                )
-                return result
-
-            elif name == "calendar_list_events":
-                if not self.calendar:
-                    return {"success": False, "error": ERR_CALENDAR_NOT_LOADED}
-                events = await self.calendar.list_events(
-                    input_data["start_time"],
-                    input_data["end_time"],
-                )
-                return {"success": True, "events": events}
-
-            elif name == "send_card":
-                card = {
-                    "type": "info",
-                    "title": input_data["title"],
-                    "content": input_data["content"],
-                    "color": input_data.get("color", "blue"),
-                }
-                await self.adapter.send(OutgoingMessage(chat_id, card=card))
-                return {"success": True, "message": RESULT_CARD_SENT}
 
             elif name == "read_self_file":
                 content = self.memory.read_self_file(input_data["filename"])
@@ -148,69 +103,6 @@ class ToolExecMixin:
                     input_data["name"],
                     input_data["enabled"],
                 )
-
-            elif name == "send_message":
-                target = input_data.get("chat_id", "")
-                if not _is_valid_chat_id(target):
-                    target = chat_id  # LLM 给了无效或截断的 ID，回退到当前会话
-                text_to_send = input_data.get("text", "")
-                image_path = input_data.get("image_path", "")
-                file_path = input_data.get("file_path", "")
-                msg = OutgoingMessage(target, text_to_send)
-                if image_path:
-                    msg.image_path = image_path
-                if file_path:
-                    msg.file_path = file_path
-                msg_id = await self.adapter.send(msg)
-                if msg_id:
-                    return {"success": True, "message_id": msg_id}
-                return {"success": False, "error": RESULT_SEND_FAILED}
-
-            elif name == "schedule_message":
-                from datetime import datetime as _dt, timezone as _tz, timedelta as _td
-
-                send_at_str = input_data["send_at"]
-                try:
-                    send_at = _dt.fromisoformat(send_at_str)
-                except ValueError:
-                    return {"success": False, "error": ERR_TIME_FORMAT_INVALID.format(value=send_at_str)}
-
-                cst = _tz(_td(hours=8))
-                now = _dt.now(cst)
-                if send_at.tzinfo is None:
-                    send_at = send_at.replace(tzinfo=cst)
-                delay = (send_at - now).total_seconds()
-                if delay < 0:
-                    return {"success": False, "error": ERR_TIME_PAST}
-
-                target_chat_id = input_data.get("chat_id", "")
-                if not _is_valid_chat_id(target_chat_id):
-                    target_chat_id = chat_id  # LLM 给了无效或截断的 ID，回退到当前会话
-                instruction = input_data["text"]
-                router_ref = self
-
-                async def _delayed_action():
-                    await asyncio.sleep(delay)
-                    try:
-                        system = router_ref.memory.build_context(
-                            chat_id=target_chat_id,
-                        )
-                        system += SCHEDULED_ACTION_PROMPT.format(
-                            instruction=instruction, chat_id=target_chat_id,
-                        )
-                        messages = [{"role": "user", "content": instruction}]
-                        result = await router_ref._reply_with_tool_loop(
-                            system, messages, target_chat_id, None,
-                        )
-                        logger.info(
-                            "定时任务已执行: chat=%s result=%s",
-                            target_chat_id, (result or "")[:80],
-                        )
-                    except Exception:
-                        logger.exception("定时任务执行失败: chat=%s", target_chat_id)
-
-                asyncio.ensure_future(_delayed_action())
-                return {"success": True, "message": RESULT_SCHEDULE_OK.format(send_at=send_at_str)}
 
             elif name == "run_claude_code":
                 if self.cc_session:
@@ -293,16 +185,6 @@ class ToolExecMixin:
                     input_data.get("days", 1),
                 )
 
-            elif name == "list_chat_members":
-                members = await self.adapter.list_members(chat_id)
-                return {
-                    "success": True,
-                    "members": [
-                        {"user_id": m.user_id, "name": m.name, "is_bot": m.is_bot}
-                        for m in members
-                    ],
-                }
-
             elif name == "browser_action":
                 return await self._tool_browser_action(input_data)
 
@@ -319,18 +201,8 @@ class ToolExecMixin:
                 # 尝试自定义工具注册表
                 if self.tool_registry and self.tool_registry.has_tool(name):
                     import httpx
-                    
-                    # 构建可调用函数包装，供自定义工具使用
-                    async def _ctx_send_message(chat_id: str, text: str = "", image_path: str = "", file_path: str = "") -> dict:
-                        from lq.platform import OutgoingMessage
-                        msg = OutgoingMessage(chat_id, text)
-                        if image_path:
-                            msg.image_path = image_path
-                        if file_path:
-                            msg.file_path = file_path
-                        msg_id = await self.adapter.send(msg)
-                        return {"success": bool(msg_id), "message_id": msg_id}
 
+                    # 构建可调用函数包装，供自定义工具使用
                     async def _ctx_run_bash(command: str, working_dir: str = "", timeout: int = 60) -> dict:
                         if not self.bash_executor:
                             return {"success": False, "error": "Bash executor not loaded"}
@@ -347,9 +219,6 @@ class ToolExecMixin:
                         elif self.cc_executor:
                             return await self.cc_executor.execute_with_context(prompt=prompt, working_dir=working_dir, timeout=timeout)
                         return {"success": False, "error": "Claude Code executor not loaded"}
-
-                    async def _ctx_schedule_message(chat_id: str, text: str, send_at: str) -> dict:
-                        return await self._execute_tool("schedule_message", {"chat_id": chat_id, "text": text, "send_at": send_at}, chat_id)
 
                     async def _ctx_read_self_file(filename: str) -> dict:
                         content = self.memory.read_self_file(filename)
@@ -373,13 +242,11 @@ class ToolExecMixin:
                             "chat_id": chat_id,
                             "adapter": self.adapter,
                             "memory": self.memory,
-                            "calendar": self.calendar,
+                            "calendar": None,
                             "session_mgr": self.session_mgr,
                             "http": http_client,
-                            "send_message": _ctx_send_message,
                             "run_bash": _ctx_run_bash,
                             "run_claude_code": _ctx_run_claude_code,
-                            "schedule_message": _ctx_schedule_message,
                             "read_self_file": _ctx_read_self_file,
                             "write_self_file": _ctx_write_self_file,
                             "write_memory": _ctx_write_memory,
@@ -509,79 +376,3 @@ class ToolExecMixin:
             blocks.append({"type": "text", "text": "（用户发送了图片）"})
 
         return blocks
-
-    # ── 语音转文字 ──
-
-    async def _transcribe_audio(self, msg: IncomingMessage) -> str:
-        """下载语音消息并调用 STT 转写为文本。
-
-        返回 "[语音转文字] {text}"，失败时返回空字符串。
-        """
-        if not self.voice or not self.voice.stt_enabled:
-            return ""
-        if not msg.audio_keys:
-            return ""
-
-        import base64 as _b64
-
-        key = msg.audio_keys[0]
-        _t_dl0 = time.perf_counter()
-        result = await self.adapter.fetch_media(msg.message_id, key)
-        _t_dl1 = time.perf_counter()
-        if not result:
-            logger.warning("语音下载失败: msg=%s key=%s", msg.message_id, key[:40])
-            return ""
-
-        b64_data, mime_type = result
-        audio_bytes = _b64.b64decode(b64_data)
-        logger.info(
-            "语音下载完成: bytes=%d mime=%s download=%.2fs",
-            len(audio_bytes), mime_type, _t_dl1 - _t_dl0,
-        )
-
-        try:
-            _t_stt0 = time.perf_counter()
-            text = await self.voice.transcribe(audio_bytes, mime_type)
-            _t_stt1 = time.perf_counter()
-            if text:
-                logger.info(
-                    "语音转文字成功: stt_total=%.2fs text=%s",
-                    _t_stt1 - _t_stt0, text[:80],
-                )
-                return f"[语音转文字] {text}"
-        except Exception:
-            logger.exception("语音转文字失败")
-        return ""
-
-    async def _send_audio_reply(
-        self, text: str, chat_id: str, reply_to: str = "",
-    ) -> None:
-        """将文本合成为语音并发送。静默失败（降级为纯文本已在调用方完成）。"""
-        if not self.voice or not self.voice.tts_reply:
-            return
-
-        import os
-        import tempfile
-
-        try:
-            audio_bytes, mime_type = await self.voice.synthesize(text)
-            if "mpeg" in mime_type or "mp3" in mime_type:
-                suffix = ".mp3"
-            elif "wav" in mime_type:
-                suffix = ".wav"
-            else:
-                suffix = ".ogg"
-            fd, temp_path = tempfile.mkstemp(suffix=suffix)
-            try:
-                with os.fdopen(fd, "wb") as f:
-                    f.write(audio_bytes)
-                await self.adapter.send(OutgoingMessage(
-                    chat_id, audio_path=temp_path, reply_to=reply_to,
-                ))
-            finally:
-                try:
-                    os.unlink(temp_path)
-                except OSError:
-                    pass
-        except Exception:
-            logger.debug("TTS 发送失败，降级为纯文本", exc_info=True)

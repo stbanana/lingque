@@ -15,7 +15,6 @@ from lq.platform.types import (
     CardAction,
 )
 from lq.platform.adapter import PlatformAdapter
-from lq.platform.multi import MultiAdapter
 
 __all__ = [
     "ChatType",
@@ -29,5 +28,4 @@ __all__ = [
     "Reaction",
     "CardAction",
     "PlatformAdapter",
-    "MultiAdapter",
 ]

@@ -294,16 +294,6 @@ class MemoryManager:
             except Exception:
                 logger.warning("运行状态注入失败", exc_info=True)
 
-        # 跨实例感知（基于飞书群聊中观察到的其他 bot）
-        if self.stats_provider:
-            try:
-                siblings = self.stats_provider().get("siblings", [])
-                if siblings:
-                    names = "、".join(siblings)
-                    awareness_content += f"\n### 姐妹实例\n你在飞书群聊中的姐妹实例: {names}\n"
-            except Exception:
-                pass
-
         # 主人身份注入
         if self.stats_provider:
             try:

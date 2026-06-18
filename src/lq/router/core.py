@@ -8,7 +8,6 @@ import time
 from collections import OrderedDict
 from typing import Any
 
-from lq.buffer import MessageBuffer
 from lq.executor.api import DirectAPIExecutor, OpenAIExecutor
 from lq.memory import MemoryManager
 from lq.platform import (
@@ -19,7 +18,6 @@ from lq.prompts import PREAMBLE_STARTS, BOT_POLL_AT_REASON, SILENCE_MARKER
 
 from .defs import TOOLS
 from .private import PrivateChatMixin
-from .group import GroupChatMixin
 from .tool_loop import ToolLoopMixin
 from .tool_exec import ToolExecMixin
 from .vision_mcp import VisionMCPMixin
@@ -32,7 +30,6 @@ logger = logging.getLogger(__name__)
 
 class MessageRouter(
     PrivateChatMixin,
-    GroupChatMixin,
     ToolLoopMixin,
     ToolExecMixin,
     VisionMCPMixin,
@@ -44,7 +41,6 @@ class MessageRouter(
 
     具体处理逻辑由各 Mixin 提供：
     - PrivateChatMixin   — 私聊处理与自我反思
-    - GroupChatMixin      — 群聊三层介入与协作
     - ToolLoopMixin       — LLM 工具调用循环与审批
     - ToolExecMixin       — 工具执行分发与多模态
     - WebToolsMixin       — 联网搜索、网页抓取
@@ -70,8 +66,8 @@ class MessageRouter(
         # 启动时间戳（毫秒），用于区分历史消息和新消息
         self._startup_ts: int = int(time.time() * 1000)
 
-        # 群聊缓冲区
-        self.group_buffers: dict[str, MessageBuffer] = {}
+        # 群聊缓冲区（保留结构供 mixin 引用）
+        self.group_buffers: dict[str, Any] = {}
         # 私聊防抖：chat_id → {texts, message_id, timer, event}
         self._private_pending: dict[str, dict] = {}
         self._private_debounce_seconds: float = 1.5
@@ -110,8 +106,7 @@ class MessageRouter(
         self.bash_executor: Any = None
         self.tool_registry: Any = None
         self.post_processor: Any = None
-        self.config: Any = None  # LQConfig, 由 gateway 注入
-        self.voice: Any = None   # VoiceService, 由 gateway 注入
+        self.config: Any = None  # LQConfig, 由 conversation 注入
 
     # ── 事件入口 ──
 
@@ -281,7 +276,7 @@ class MessageRouter(
                 self._bot_seen_ids.pop(msg.chat_id, None)
                 self._last_reply_per_chat.pop(msg.chat_id, None)
                 self._addressed_topics.pop(msg.chat_id, None)
-            await self._handle_group(msg)
+            # Group chat handling removed (local mode only)
 
     # ── 工具管理 ──
 
@@ -367,20 +362,7 @@ class MessageRouter(
             logger.info("本地回复（未发送）: %s", text[:200])
 
     def _get_owner_chat_id(self) -> str | None:
-        """获取主人 chat_id，优先 Discord，回退飞书。"""
-        if not self.config:
-            return None
-        discord_cfg = getattr(self.config, "discord", None)
-        if discord_cfg:
-            val = (
-                getattr(discord_cfg, "owner_user_id", None)
-                or getattr(discord_cfg, "owner_chat_id", None)
-            )
-            if val:
-                return val
-        feishu_cfg = getattr(self.config, "feishu", None)
-        if feishu_cfg:
-            return getattr(feishu_cfg, "owner_chat_id", None)
+        """获取主人 chat_id（本地模式无平台 chat_id）。"""
         return None
 
     # ── 卡片回调 ──

@@ -49,44 +49,6 @@ class APIConfig:
 
 
 @dataclass
-class FeishuConfig:
-    app_id: str = ""
-    app_secret: str = ""
-    bot_open_id: str = ""  # 启动时自动获取
-    owner_chat_id: str = ""  # 主人的 chat_id，用于晨报等主动消息
-
-
-@dataclass
-class DiscordConfig:
-    bot_token: str = ""
-    bot_id: str = ""  # 启动时自动获取
-    owner_chat_id: str = ""   # guild text channel id（可选）
-    owner_user_id: str = ""   # 主人 Discord User ID → 运行时解析成 DM channel
-
-
-@dataclass
-class TelegramConfig:
-    bot_token: str = ""
-    bot_id: str = ""  # 启动时自动获取
-    owner_chat_id: str = ""
-
-
-@dataclass
-class WechatConfig:
-    bot_token: str = ""      # iLink bot_token（QR 登录后获取）
-    bot_id: str = ""         # iLink bot_id（启动时自动获取）
-    base_url: str = ""       # iLink API base URL
-    owner_chat_id: str = ""  # 主人的 iLink user_id
-
-
-@dataclass
-class WecomConfig:
-    bot_id: str = ""          # 企业微信 AI 机器人 BotID
-    secret: str = ""          # 长连接专用密钥 Secret
-    owner_chat_id: str = ""   # 主人的 userid
-
-
-@dataclass
 class VisionConfig:
     """视觉理解模型配置（OpenAI 兼容端点，支持图片+视频）。
 
@@ -104,20 +66,6 @@ class VisionConfig:
 
 
 @dataclass
-class VoiceConfig:
-    stt_base_url: str = ""      # STT API 地址，如 "https://api.openai.com/v1"
-    stt_api_key: str = ""
-    stt_model: str = "whisper-1"
-    stt_language: str = ""      # STT 语言提示，如 "zh"(OpenAI) / "zh-CN"(tengen)，为空则自动检测
-    tts_base_url: str = ""      # TTS API 地址，如 "https://api.openai.com/v1"
-    tts_api_key: str = ""
-    tts_model: str = "tts-1"
-    tts_voice: str = "alloy"    # TTS voice，如 "alloy"(OpenAI) / "zh-CN-XiaoxiaoNeural"(tengen)
-    tts_format: str = "opus"   # TTS 输出格式: opus/mp3/wav/aac/flac/pcm（推荐 opus，体积最小）
-    tts_reply: bool = False     # True = 语音输入时回复文字+音频；False = 仅文字
-
-
-@dataclass
 class GroupConfig:
     chat_id: str = ""
     note: str = ""  # 群描述/用途，用于 LLM 介入判断
@@ -129,28 +77,14 @@ class LQConfig:
     name: str = "lingque"       # 显示名（可以是中文）
     slug: str = ""              # 目录名（纯 ASCII），为空时自动从 name 生成
     api: APIConfig = field(default_factory=APIConfig)
-    feishu: FeishuConfig = field(default_factory=FeishuConfig)
-    discord: DiscordConfig = field(default_factory=DiscordConfig)
-    telegram: TelegramConfig = field(default_factory=TelegramConfig)
-    wechat: WechatConfig = field(default_factory=WechatConfig)
-    wecom: WecomConfig = field(default_factory=WecomConfig)
     vision: VisionConfig = field(default_factory=VisionConfig)
-    voice: VoiceConfig = field(default_factory=VoiceConfig)
     model: str = "glm-5"
-    heartbeat_interval: int = 3600  # 秒；<=0 禁用心跳（自主行动循环不会触发）
-    active_hours: tuple[int, int] = (8, 23)  # 活跃时段
     groups: list[GroupConfig] = field(default_factory=list)
     cost_alert_daily: float = 5.0  # USD
-    curiosity_budget: float = 1.0  # 每日好奇心探索预算 (USD)
-    evolution_max_daily: int = 3   # 每日最大自进化次数
-    evolution_budget: float = 2.0  # 每日自进化预算 (USD)
-    owner_name: str = ""  # 主人的飞书名（init 时设置，用于运行时自动发现 owner_chat_id）
+    owner_name: str = ""  # 主人名（init 时设置）
     chat_memory_budget: int = 2000  # per-chat 长期记忆 token 预算
     autonomous_max_continuations: int = 5  # 每次心跳最多连续执行几轮自主行动
-    heartbeat_min_interval: int = 300  # 心跳最短间隔（秒），有事做时缩短到此值
-    recent_conversation_preview: int = 20  # 心跳自主行动时对话预览总条数上限
-    backup_max_count: int = 10          # 最多保留几个备份
-    backup_size_threshold: int = 524288 # 512KB，文件夹增量触发阈值
+    recent_conversation_preview: int = 20  # 对话预览总条数上限
     show_thinking: bool = False  # 是否输出工具调用记录和思考过程（默认关闭，--show-thinking 开启）
     cc_max_budget_usd: float = 0.5  # Claude Code 单次执行成本上限 (USD)
     browser_port: int = 9222  # Chrome DevTools Protocol 调试端口
@@ -161,9 +95,7 @@ class LQConfig:
             self.slug = slugify(self.name)
 
     def to_dict(self) -> dict:
-        d = asdict(self)
-        d["active_hours"] = list(self.active_hours)
-        return d
+        return asdict(self)
 
     @classmethod
     def from_dict(cls, d: dict) -> LQConfig:
@@ -171,24 +103,16 @@ class LQConfig:
         cfg.name = d.get("name", "lingque")
         cfg.slug = d.get("slug", "")
         cfg.model = d.get("model", "")
-        cfg.heartbeat_interval = d.get("heartbeat_interval", 3600)
         cfg.cost_alert_daily = d.get("cost_alert_daily", 5.0)
-        cfg.curiosity_budget = d.get("curiosity_budget", 1.0)
-        cfg.evolution_max_daily = d.get("evolution_max_daily", 3)
-        cfg.evolution_budget = d.get("evolution_budget", 2.0)
         cfg.owner_name = d.get("owner_name", "")
         cfg.chat_memory_budget = d.get("chat_memory_budget", 2000)
         cfg.autonomous_max_continuations = d.get("autonomous_max_continuations", 5)
-        cfg.heartbeat_min_interval = d.get("heartbeat_min_interval", 300)
         cfg.recent_conversation_preview = d.get("recent_conversation_preview", 20)
-        cfg.backup_max_count = d.get("backup_max_count", 10)
-        cfg.backup_size_threshold = d.get("backup_size_threshold", 524288)
         cfg.show_thinking = d.get("show_thinking", False)
         cfg.cc_max_budget_usd = d.get("cc_max_budget_usd", 0.5)
+        cfg.browser_port = d.get("browser_port", 9222)
         et = d.get("enabled_tools")
         cfg.enabled_tools = list(et) if isinstance(et, list) else None
-        ah = d.get("active_hours", [8, 23])
-        cfg.active_hours = (ah[0], ah[1])
 
         api = d.get("api", {})
         api_key = api.get("api_key", "")
@@ -201,44 +125,6 @@ class LQConfig:
             extra_body=dict(api.get("extra_body", {}) or {}),
         )
 
-        fs = d.get("feishu", {})
-        cfg.feishu = FeishuConfig(
-            app_id=fs.get("app_id", ""),
-            app_secret=fs.get("app_secret", ""),
-            bot_open_id=fs.get("bot_open_id", ""),
-            owner_chat_id=fs.get("owner_chat_id", ""),
-        )
-
-        dc = d.get("discord", {})
-        cfg.discord = DiscordConfig(
-            owner_chat_id=dc.get("owner_chat_id", ""),
-            owner_user_id=dc.get("owner_user_id", ""),
-            bot_token=dc.get("bot_token", ""),
-            bot_id=dc.get("bot_id", ""),
-        )
-
-        tg = d.get("telegram", {})
-        cfg.telegram = TelegramConfig(
-            bot_token=tg.get("bot_token", ""),
-            bot_id=tg.get("bot_id", ""),
-            owner_chat_id=tg.get("owner_chat_id", ""),
-        )
-
-        wc = d.get("wechat", {})
-        cfg.wechat = WechatConfig(
-            bot_token=wc.get("bot_token", ""),
-            bot_id=wc.get("bot_id", ""),
-            base_url=wc.get("base_url", ""),
-            owner_chat_id=wc.get("owner_chat_id", ""),
-        )
-
-        wce = d.get("wecom", {})
-        cfg.wecom = WecomConfig(
-            bot_id=wce.get("bot_id", ""),
-            secret=wce.get("secret", ""),
-            owner_chat_id=wce.get("owner_chat_id", ""),
-        )
-
         vis = d.get("vision", {})
         cfg.vision = VisionConfig(
             base_url=vis.get("base_url", ""),
@@ -246,20 +132,6 @@ class LQConfig:
             model=vis.get("model", ""),
             fps=float(vis.get("fps", 2.0)),
             extra_params=dict(vis.get("extra_params", {}) or {}),
-        )
-
-        vc = d.get("voice", {})
-        cfg.voice = VoiceConfig(
-            stt_base_url=vc.get("stt_base_url", ""),
-            stt_api_key=vc.get("stt_api_key", ""),
-            stt_model=vc.get("stt_model", "whisper-1"),
-            stt_language=vc.get("stt_language", ""),
-            tts_base_url=vc.get("tts_base_url", ""),
-            tts_api_key=vc.get("tts_api_key", ""),
-            tts_model=vc.get("tts_model", "tts-1"),
-            tts_voice=vc.get("tts_voice", "alloy"),
-            tts_format=vc.get("tts_format", "opus"),
-            tts_reply=vc.get("tts_reply", False),
         )
 
         cfg.groups = [GroupConfig(**g) for g in d.get("groups", [])]
@@ -321,6 +193,7 @@ def load_from_env(env_path: Path) -> LQConfig:
     cfg.api.base_url = vals.get("ANTHROPIC_BASE_URL", cfg.api.base_url)
     cfg.api.api_format = vals.get("API_FORMAT", "anthropic")
     cfg.model = vals.get("MODEL", "") or cfg.model
+    cfg.owner_name = vals.get("OWNER_NAME", "") or cfg.owner_name
     cfg.api.proxy = (
         vals.get("HTTPS_PROXY")
         or vals.get("HTTP_PROXY")
@@ -340,13 +213,6 @@ def load_from_env(env_path: Path) -> LQConfig:
                 cfg.api.extra_body = parsed
         except json.JSONDecodeError as e:
             logger.warning("API_EXTRA_BODY JSON 解析失败，已忽略: %s", e)
-    cfg.feishu.app_id = vals.get("FEISHU_APP_ID", "")
-    cfg.feishu.app_secret = vals.get("FEISHU_APP_SECRET", "")
-    cfg.discord.bot_token = vals.get("DISCORD_BOT_TOKEN", "")
-    cfg.telegram.bot_token = vals.get("TELEGRAM_BOT_TOKEN", "")
-    cfg.wechat.bot_token = vals.get("WECHAT_BOT_TOKEN", "")
-    cfg.wecom.bot_id = vals.get("WECOM_BOT_ID", "")
-    cfg.wecom.secret = vals.get("WECOM_SECRET", "")
 
     cfg.vision.base_url = vals.get("VISION_BASE_URL", "")
     cfg.vision.api_key = vals.get("VISION_API_KEY", "")
@@ -356,18 +222,5 @@ def load_from_env(env_path: Path) -> LQConfig:
     except ValueError:
         pass
     # extra_params 为厂商特有字段，建议直接在 config.json 里维护，env 不支持
-
-    cfg.voice.stt_base_url = vals.get("VOICE_STT_BASE_URL", "")
-    cfg.voice.stt_api_key = vals.get("VOICE_STT_API_KEY", "")
-    cfg.voice.stt_model = vals.get("VOICE_STT_MODEL", "") or cfg.voice.stt_model
-    cfg.voice.stt_language = vals.get("VOICE_STT_LANGUAGE", "")
-    cfg.voice.tts_base_url = vals.get("VOICE_TTS_BASE_URL", "")
-    cfg.voice.tts_api_key = vals.get("VOICE_TTS_API_KEY", "")
-    cfg.voice.tts_model = vals.get("VOICE_TTS_MODEL", "") or cfg.voice.tts_model
-    cfg.voice.tts_voice = vals.get("VOICE_TTS_VOICE", "") or cfg.voice.tts_voice
-    cfg.voice.tts_format = vals.get("VOICE_TTS_FORMAT", "") or cfg.voice.tts_format
-    tts_reply = vals.get("VOICE_TTS_REPLY", "").lower()
-    if tts_reply in ("true", "1", "yes"):
-        cfg.voice.tts_reply = True
 
     return cfg

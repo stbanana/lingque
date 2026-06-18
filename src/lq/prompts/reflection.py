@@ -103,7 +103,7 @@ CURIOSITY_EXPLORE_PROMPT = (
     "4. **执行**：用 run_claude_code（working_dir={source_root}）实现改进\n"
     "   - prompt 要详细描述改什么、在哪个文件\n"
     "   - prompt 中要求 Claude Code 用正确的签名 commit（参照 CONTRIBUTING.md 中的签名格式）\n"
-    "5. **验证**：用 run_bash 跑 `cd {source_root} && python -c 'from lq.gateway import AssistantGateway'`\n"
+    "5. **验证**：用 run_bash 跑 `cd {source_root} && python -c 'from lq.conversation import run_conversation'`\n"
     "   - 失败则 `cd {source_root} && git checkout master` 回滚并删除分支\n"
     "6. **推送**：`cd {source_root} && git push origin feature/xxx`\n"
     "7. **记录**：用 write_self_file 更新 EVOLUTION.md（待办→已完成），用 send_message 通知主人审核\n\n"

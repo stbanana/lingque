@@ -5,7 +5,6 @@ from __future__ import annotations
 import asyncio
 import json
 import os
-import signal
 import subprocess
 import sys
 from pathlib import Path
@@ -26,7 +25,6 @@ from lq.templates import (
     write_heartbeat_template,
     write_memory_template,
     write_soul_template,
-    write_service_config,
 )
 
 
@@ -50,13 +48,13 @@ def _resolve(instance: str) -> tuple[Path, str, LQConfig | None]:
 @click.group()
 @click.version_option(package_name="lingque")
 def cli() -> None:
-    """灵雀 — 深度集成飞书的个人 AI 助理框架"""
+    """灵雀 — 个人 AI 助理框架"""
 
 
 @cli.command()
 @click.option("--name", prompt="助理名称", help="助理实例名称（支持中文）")
 @click.option("--from-env", type=click.Path(exists=True), help="从 .env 文件读取凭证")
-@click.option("--owner", default="", help="主人的飞书名（安全相关：用于审批确认。留空则首个私聊用户自动成为主人）")
+@click.option("--owner", default="", help="主人名（安全相关：用于审批确认。留空则首个私聊用户自动成为主人）")
 def init(name: str, from_env: str | None, owner: str) -> None:
     """初始化一个新的灵雀实例"""
     slug = slugify(name)
@@ -73,9 +71,7 @@ def init(name: str, from_env: str | None, owner: str) -> None:
         config.slug = slug
     else:
         config = LQConfig(name=name, slug=slug)
-        config.feishu.app_id = click.prompt("飞书 App ID")
-        config.feishu.app_secret = click.prompt("飞书 App Secret", hide_input=True)
-        config.api.api_key = click.prompt("Anthropic API Key", hide_input=True)
+        config.api.api_key = click.prompt("API Key", hide_input=True)
         config.api.base_url = click.prompt(
             "API Base URL",
             default=config.api.base_url,
@@ -119,160 +115,16 @@ def init(name: str, from_env: str | None, owner: str) -> None:
     from lq.templates import write_progress_template
     write_progress_template(home / "PROGRESS.md")
 
-    # 生成服务配置（根据平台选择 systemd 或 launchd）
-    service_path, service_type = write_service_config(slug)
-
     click.echo(f"✓ 实例 @{name} (slug: {slug}) 初始化完成")
     click.echo(f"  配置目录: {home}")
-    click.echo(f"  服务配置:  {service_path} ({service_type})")
     if owner:
         click.echo(f"  主人:      {owner}")
     else:
         click.echo("  主人:      未设置（首个私聊用户将自动成为主人）")
     click.echo()
-    click.echo("⚠ 安全提示: 主人身份决定了谁能审批敏感操作。")
-    click.echo("  建议使用 --owner 指定主人名，或在启动后尽快私聊 bot 以绑定身份。")
-    click.echo()
     click.echo("后续操作:")
     click.echo(f"  编辑人格:   $EDITOR {home}/SOUL.md")
-    click.echo(f"  启动:       uv run lq start @{name}")
-
-    # 根据平台显示不同的服务管理命令
-    if service_type == "launchd":
-        bundle_id = f"ai.lingque.{slug}"
-        click.echo(f"  服务管理:   launchctl load {service_path}")
-        click.echo(f"              launchctl unload {bundle_id}")
-        click.echo(f"              launchctl list | grep {bundle_id}")
-    else:
-        click.echo(f"  服务管理:   systemctl --user enable --now lq-{slug}")
-        click.echo(f"              systemctl --user status lq-{slug}")
-        click.echo(f"              journalctl --user -u lq-{slug} -f")
-
-
-def _parse_adapters(adapter_str: str) -> list[str]:
-    """解析逗号分隔的适配器列表并校验。"""
-    from lq.gateway import KNOWN_ADAPTERS
-    types = [t.strip() for t in adapter_str.split(",") if t.strip()]
-    unknown = set(types) - KNOWN_ADAPTERS
-    if unknown:
-        raise click.BadParameter(
-            f"未知适配器: {', '.join(unknown)}（可选: {', '.join(sorted(KNOWN_ADAPTERS))}）"
-        )
-    if not types:
-        raise click.BadParameter("至少需要一个适配器")
-    return types
-
-
-@cli.command()
-@click.argument("instance")
-@click.option("--adapter", "adapter_str", default="local",
-              help="聊天平台适配器，逗号分隔多选（feishu=飞书, discord=Discord, telegram=Telegram, local=纯本地）")
-@click.option("--show-thinking", is_flag=True, default=False,
-              help="输出工具调用记录和思考过程（默认关闭）")
-def start(instance: str, adapter_str: str, show_thinking: bool) -> None:
-    """启动灵雀实例（@name 或 @slug）
-
-    \b
-    示例:
-      lq start @name                    # 默认本地（无需平台凭证）
-      lq start @name --adapter local    # 纯本地（无需飞书凭证）
-      lq start @name --adapter discord  # Discord
-      lq start @name --adapter telegram # Telegram
-      lq start @name --adapter feishu,local  # 同时连接飞书 + 本地
-      lq start @name --adapter discord,local # 同时连接 Discord + 本地
-    """
-    adapter_types = _parse_adapters(adapter_str)
-    home, display, cfg = _resolve(instance)
-
-    if not home.exists():
-        click.echo(f"错误: 实例 @{display} 不存在，请先运行 uv run lq init", err=True)
-        raise SystemExit(1)
-
-    pid = _read_pid(home)
-    if pid and _is_alive(pid):
-        click.echo(f"@{display} 已在运行 (PID {pid})", err=True)
-        raise SystemExit(1)
-
-    config = cfg or load_config(home)
-
-    if show_thinking:
-        config.show_thinking = True
-
-    click.echo(f"启动 @{display} (adapter={'+'.join(adapter_types)}) ...")
-
-    if "local" in adapter_types and len(adapter_types) == 1:
-        click.echo("💡 纯本地模式：通过终端 stdin 或 inbox.txt 交互，无远程连接")
-    if len(adapter_types) > 1:
-        click.echo(f"💡 多平台模式：同时连接 {', '.join(adapter_types)}，消息自动路由到来源平台")
-
-    from lq.gateway import AssistantGateway
-    gw = AssistantGateway(config, home, adapter_types=adapter_types)
-    asyncio.run(gw.run())
-    # 强制退出：避免第三方库残留线程/连接池导致进程挂起
-    raise SystemExit(0)
-
-
-@cli.command()
-@click.argument("instance")
-def stop(instance: str) -> None:
-    """停止灵雀实例"""
-    home, display, _ = _resolve(instance)
-    pid = _read_pid(home)
-
-    if not pid or not _is_alive(pid):
-        click.echo(f"@{display} 未在运行")
-        return
-
-    os.kill(pid, signal.SIGTERM)
-    click.echo(f"@{display} 正在停止 (PID {pid}) ...", nl=False)
-
-    # 等待进程退出，超时后 SIGKILL
-    import time
-    for _ in range(10):  # 最多等 10 秒
-        time.sleep(1)
-        if not _is_alive(pid):
-            click.echo(" 已停止")
-            return
-        click.echo(".", nl=False)
-
-    # 宽限期结束，强制终止
-    click.echo()
-    os.kill(pid, signal.SIGKILL)
-    click.echo(f"@{display} 强制终止 (SIGKILL)")
-
-
-@cli.command()
-@click.argument("instance")
-@click.option("--adapter", "adapter_str", default="local",
-              help="聊天平台适配器，逗号分隔多选（feishu=飞书, discord=Discord, telegram=Telegram, local=纯本地）")
-def restart(instance: str, adapter_str: str) -> None:
-    """重启灵雀实例"""
-    adapter_types = _parse_adapters(adapter_str)
-    home, display, _ = _resolve(instance)
-    pid = _read_pid(home)
-
-    if pid and _is_alive(pid):
-        os.kill(pid, signal.SIGTERM)
-        click.echo(f"@{display} 正在停止 (PID {pid}) ...", nl=False)
-        import time
-        for _ in range(10):
-            time.sleep(1)
-            if not _is_alive(pid):
-                break
-            click.echo(".", nl=False)
-        click.echo()
-        if _is_alive(pid):
-            os.kill(pid, signal.SIGKILL)
-            time.sleep(0.5)
-            click.echo(f"@{display} 强制终止 (SIGKILL)")
-
-    config = load_config(home)
-    click.echo(f"启动 @{display} (adapter={'+'.join(adapter_types)}) ...")
-    from lq.gateway import AssistantGateway
-    gw = AssistantGateway(config, home, adapter_types=adapter_types)
-    asyncio.run(gw.run())
-    # 强制退出：避免第三方库残留线程/连接池导致进程挂起
-    raise SystemExit(0)
+    click.echo(f"  开始聊天:   uv run lq chat @{name}")
 
 
 @cli.command("list")
@@ -286,23 +138,19 @@ def list_instances() -> None:
         if not config_path.exists():
             continue
         try:
-            with open(config_path) as f:
+            with open(config_path, encoding="utf-8") as f:
                 d = json.load(f)
-            if "feishu" not in d or "api" not in d:
+            if "api" not in d:
                 continue
         except (json.JSONDecodeError, KeyError):
             continue
 
         name = d.get("name", "?")
         slug = d.get("slug", entry.name.removeprefix(".lq-"))
-        pid = _read_pid(entry)
-        status = "🟢 running" if pid and _is_alive(pid) else "⚫ stopped"
         label = f"@{name}" if name != slug else f"@{slug}"
         if name != slug:
             label += f"  ({slug})"
-        click.echo(f"  {label:30s} {status}")
-        if pid and _is_alive(pid):
-            click.echo(f"    PID: {pid}")
+        click.echo(f"  {label:30s}")
         found = True
 
     if not found:
@@ -320,22 +168,9 @@ def status(instance: str) -> None:
         raise SystemExit(1)
 
     config = cfg or load_config(home)
-    pid = _read_pid(home)
-    alive = pid and _is_alive(pid)
 
     click.echo(f"实例: @{config.name}  (slug: {config.slug})")
     click.echo(f"目录: {home}")
-    click.echo(f"状态: {'🟢 运行中' if alive else '⚫ 已停止'}")
-    if alive:
-        click.echo(f"PID:  {pid}")
-        try:
-            with open(f"/proc/{pid}/status") as f:
-                for line in f:
-                    if line.startswith("VmRSS:"):
-                        click.echo(f"内存: {line.split(':')[1].strip()}")
-                        break
-        except (FileNotFoundError, PermissionError):
-            pass
 
     stats_file = home / "stats.jsonl"
     if stats_file.exists():
@@ -365,40 +200,6 @@ def status(instance: str) -> None:
             pass
 
 
-@cli.command()
-@click.argument("instance")
-@click.option("--since", default=None, help="显示最近多长时间的日志（如 1h, 30m）")
-def logs(instance: str, since: str | None) -> None:
-    """查看实例日志"""
-    home, display, _ = _resolve(instance)
-    log_file = home / "logs" / "gateway.log"
-
-    if not log_file.exists():
-        click.echo("暂无日志")
-        return
-
-    if since:
-        import re
-        from datetime import datetime, timedelta
-        match = re.match(r"(\d+)([hm])", since)
-        if match:
-            val, unit = int(match.group(1)), match.group(2)
-            delta = timedelta(hours=val) if unit == "h" else timedelta(minutes=val)
-            cutoff = datetime.now() - delta
-            with open(log_file) as f:
-                for line in f:
-                    try:
-                        ts = datetime.fromisoformat(line[:19])
-                        if ts >= cutoff:
-                            click.echo(line, nl=False)
-                    except ValueError:
-                        click.echo(line, nl=False)
-        else:
-            click.echo(f"无效时间格式: {since}，使用如 1h, 30m", err=True)
-    else:
-        subprocess.run(["tail", "-f", str(log_file)])
-
-
 def _run_local_chat(instance: str, message: str, project_workspace: Path | None = None) -> None:
     """共用逻辑：本地对话（chat / say 共享）"""
     home, display, cfg = _resolve(instance)
@@ -420,7 +221,7 @@ def _run_local_chat(instance: str, message: str, project_workspace: Path | None 
 @click.option("--workspace", type=click.Path(exists=True, file_okay=False), default=None,
               help="项目工作区路径（默认为当前目录）")
 def chat(instance: str, message: str, workspace: str | None) -> None:
-    """和灵雀聊天（本地终端，不依赖飞书）
+    """和灵雀聊天（本地终端）
 
     \b
     交互模式:  lq chat @name
@@ -459,43 +260,3 @@ def edit(instance: str, target: str) -> None:
     }
     editor = os.environ.get("EDITOR", "vi")
     subprocess.run([editor, str(file_map[target])])
-
-
-@cli.command()
-@click.argument("instance")
-def upgrade(instance: str) -> None:
-    """升级灵雀框架"""
-    home, display, cfg = _resolve(instance)
-    config = cfg or load_config(home)
-
-    config_path = home / "config.json"
-    backup_path = home / "config.json.bak"
-    if config_path.exists():
-        import shutil
-        shutil.copy2(config_path, backup_path)
-        click.echo(f"配置已备份到 {backup_path}")
-
-    click.echo("升级 lingque ...")
-    subprocess.run(["uv", "sync", "--upgrade"])
-
-    service_path, service_type = write_service_config(config.slug)
-    click.echo(f"@{display} 升级完成")
-    click.echo(f"服务配置已更新: {service_path} ({service_type})")
-
-
-def _read_pid(home: Path) -> int | None:
-    pid_path = home / "gateway.pid"
-    if pid_path.exists():
-        try:
-            return int(pid_path.read_text().strip())
-        except (ValueError, OSError):
-            return None
-    return None
-
-
-def _is_alive(pid: int) -> bool:
-    try:
-        os.kill(pid, 0)
-        return True
-    except (OSError, ProcessLookupError):
-        return False

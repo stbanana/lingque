@@ -359,18 +359,6 @@ async def run_conversation(
     # CLI 不需要防抖（用户手动输入，每条消息立即处理）
     router._private_debounce_seconds = 0.01
 
-    # 初始化后处理管线
-    from lq.intent import IntentDetector
-    from lq.subagent import SubAgent
-    from lq.postprocessor import PostProcessor
-
-    detector = IntentDetector(executor)
-    subagent = SubAgent(executor)
-    post_processor = PostProcessor(
-        detector, subagent, router._execute_tool, router._send_tool_notification,
-    )
-    router.post_processor = post_processor
-
     chat_id = LOCAL_CHAT_ID
     msg_counter = 0
 

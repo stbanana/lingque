@@ -4,17 +4,15 @@ from __future__ import annotations
 
 from lq.prompts import (
     TOOL_DESC_WRITE_MEMORY, TOOL_DESC_WRITE_CHAT_MEMORY,
-    TOOL_DESC_CALENDAR_CREATE, TOOL_DESC_CALENDAR_LIST,
-    TOOL_DESC_SEND_CARD, TOOL_DESC_READ_SELF_FILE, TOOL_DESC_WRITE_SELF_FILE,
+    TOOL_DESC_READ_SELF_FILE, TOOL_DESC_WRITE_SELF_FILE,
     TOOL_DESC_CREATE_CUSTOM_TOOL, TOOL_DESC_LIST_CUSTOM_TOOLS,
     TOOL_DESC_TEST_CUSTOM_TOOL, TOOL_DESC_DELETE_CUSTOM_TOOL,
-    TOOL_DESC_TOGGLE_CUSTOM_TOOL, TOOL_DESC_SEND_MESSAGE,
-    TOOL_DESC_SCHEDULE_MESSAGE, TOOL_DESC_RUN_CLAUDE_CODE, TOOL_DESC_RUN_BASH,
+    TOOL_DESC_TOGGLE_CUSTOM_TOOL,
+    TOOL_DESC_RUN_CLAUDE_CODE, TOOL_DESC_RUN_BASH,
     TOOL_DESC_WEB_SEARCH, TOOL_DESC_WEB_FETCH,
     TOOL_DESC_RUN_PYTHON, TOOL_DESC_READ_FILE, TOOL_DESC_WRITE_FILE,
     TOOL_DESC_GET_MY_STATS, TOOL_FIELD_STATS_CATEGORY,
     TOOL_DESC_DETECT_DRIFT, TOOL_FIELD_DRIFT_DAYS,
-    TOOL_DESC_LIST_CHAT_MEMBERS,
     TOOL_DESC_BROWSER_ACTION,
     TOOL_FIELD_BROWSER_ACTION, TOOL_FIELD_BROWSER_URL,
     TOOL_FIELD_BROWSER_SELECTOR, TOOL_FIELD_BROWSER_TEXT,
@@ -24,16 +22,10 @@ from lq.prompts import (
     TOOL_FIELD_BROWSER_COOKIE_PATH,
     TOOL_FIELD_SECTION, TOOL_FIELD_CONTENT_MEMORY,
     TOOL_FIELD_CHAT_SECTION, TOOL_FIELD_CHAT_CONTENT,
-    TOOL_FIELD_SUMMARY, TOOL_FIELD_START_TIME, TOOL_FIELD_END_TIME,
-    TOOL_FIELD_EVENT_DESC, TOOL_FIELD_QUERY_START, TOOL_FIELD_QUERY_END,
-    TOOL_FIELD_CARD_TITLE, TOOL_FIELD_CARD_CONTENT, TOOL_FIELD_CARD_COLOR,
     TOOL_FIELD_FILENAME_READ, TOOL_FIELD_FILENAME_WRITE, TOOL_FIELD_FILE_CONTENT,
     TOOL_FIELD_TOOL_NAME, TOOL_FIELD_TOOL_CODE,
     TOOL_FIELD_VALIDATE_CODE, TOOL_FIELD_DELETE_NAME,
     TOOL_FIELD_TOGGLE_NAME, TOOL_FIELD_TOGGLE_ENABLED,
-    TOOL_FIELD_CHAT_ID, TOOL_FIELD_TEXT, TOOL_FIELD_IMAGE_PATH,
-    TOOL_FIELD_FILE_PATH_SEND,
-    TOOL_FIELD_SCHEDULE_TEXT, TOOL_FIELD_SEND_AT,
     TOOL_FIELD_CC_PROMPT, TOOL_FIELD_WORKING_DIR, TOOL_FIELD_CC_TIMEOUT,
     TOOL_FIELD_CC_RESUME_SESSION, TOOL_FIELD_CC_MAX_BUDGET,
     TOOL_FIELD_BASH_COMMAND, TOOL_FIELD_BASH_TIMEOUT,
@@ -79,66 +71,6 @@ TOOLS: list[dict] = [
                 },
             },
             "required": ["section", "content"],
-        },
-    },
-    {
-        "name": "calendar_create_event",
-        "description": TOOL_DESC_CALENDAR_CREATE,
-        "input_schema": {
-            "type": "object",
-            "properties": {
-                "summary": {"type": "string", "description": TOOL_FIELD_SUMMARY},
-                "start_time": {
-                    "type": "string",
-                    "description": TOOL_FIELD_START_TIME,
-                },
-                "end_time": {
-                    "type": "string",
-                    "description": TOOL_FIELD_END_TIME,
-                },
-                "description": {
-                    "type": "string",
-                    "description": TOOL_FIELD_EVENT_DESC,
-                    "default": "",
-                },
-            },
-            "required": ["summary", "start_time", "end_time"],
-        },
-    },
-    {
-        "name": "calendar_list_events",
-        "description": TOOL_DESC_CALENDAR_LIST,
-        "input_schema": {
-            "type": "object",
-            "properties": {
-                "start_time": {
-                    "type": "string",
-                    "description": TOOL_FIELD_QUERY_START,
-                },
-                "end_time": {
-                    "type": "string",
-                    "description": TOOL_FIELD_QUERY_END,
-                },
-            },
-            "required": ["start_time", "end_time"],
-        },
-    },
-    {
-        "name": "send_card",
-        "description": TOOL_DESC_SEND_CARD,
-        "input_schema": {
-            "type": "object",
-            "properties": {
-                "title": {"type": "string", "description": TOOL_FIELD_CARD_TITLE},
-                "content": {"type": "string", "description": TOOL_FIELD_CARD_CONTENT},
-                "color": {
-                    "type": "string",
-                    "description": TOOL_FIELD_CARD_COLOR,
-                    "enum": ["blue", "green", "orange", "red", "purple"],
-                    "default": "blue",
-                },
-            },
-            "required": ["title", "content"],
         },
     },
     {
@@ -230,54 +162,6 @@ TOOLS: list[dict] = [
                 "enabled": {"type": "boolean", "description": TOOL_FIELD_TOGGLE_ENABLED},
             },
             "required": ["name", "enabled"],
-        },
-    },
-    {
-        "name": "send_message",
-        "description": TOOL_DESC_SEND_MESSAGE,
-        "input_schema": {
-            "type": "object",
-            "properties": {
-                "chat_id": {
-                    "type": "string",
-                    "description": TOOL_FIELD_CHAT_ID,
-                },
-                "text": {
-                    "type": "string",
-                    "description": TOOL_FIELD_TEXT,
-                },
-                "image_path": {
-                    "type": "string",
-                    "description": TOOL_FIELD_IMAGE_PATH,
-                },
-                "file_path": {
-                    "type": "string",
-                    "description": TOOL_FIELD_FILE_PATH_SEND,
-                },
-            },
-            "required": ["chat_id"],
-        },
-    },
-    {
-        "name": "schedule_message",
-        "description": TOOL_DESC_SCHEDULE_MESSAGE,
-        "input_schema": {
-            "type": "object",
-            "properties": {
-                "chat_id": {
-                    "type": "string",
-                    "description": TOOL_FIELD_CHAT_ID,
-                },
-                "text": {
-                    "type": "string",
-                    "description": TOOL_FIELD_SCHEDULE_TEXT,
-                },
-                "send_at": {
-                    "type": "string",
-                    "description": TOOL_FIELD_SEND_AT,
-                },
-            },
-            "required": ["chat_id", "text", "send_at"],
         },
     },
     {
@@ -572,14 +456,6 @@ TOOLS: list[dict] = [
                     "default": 1,
                 },
             },
-        },
-    },
-    {
-        "name": "list_chat_members",
-        "description": TOOL_DESC_LIST_CHAT_MEMBERS,
-        "input_schema": {
-            "type": "object",
-            "properties": {},
         },
     },
 ]

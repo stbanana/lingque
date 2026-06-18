@@ -178,24 +178,7 @@ class PrivateChatMixin:
         if reply_text:
             asyncio.create_task(self._reflect_on_reply(chat_id, reply_text))
 
-        # ── on_reply 钩子（post-turn）──
-        # 让自定义工具（如 parse_form）能拿到本轮真实的 user/agent 文本和工具列表，
-        # 做镜像/同步等副作用 —— 把"代 LLM 说话"的职责彻底搬出 LLM 视野。
-        if reply_text:
-            tools_called = self._last_turn_tools.pop(chat_id, [])
-            try:
-                from lq.hooks import hooks
-                asyncio.create_task(hooks.trigger(
-                    "on_reply",
-                    chat_id=chat_id,
-                    user_text=combined_text,
-                    reply_text=reply_text,
-                    tools_called=tools_called,
-                    adapter=self.adapter,
-                    sender_name=sender_name,
-                ))
-            except Exception:
-                logger.exception("on_reply 钩子触发失败")
+        # on_reply post-turn hook removed (hooks.py deleted)
 
     # ── 私聊系统 prompt 构建 ──
 
@@ -296,22 +279,7 @@ class PrivateChatMixin:
             if reply_text:
                 asyncio.create_task(self._reflect_on_reply(chat_id, reply_text))
 
-            # on_reply 钩子（post-turn）
-            if reply_text:
-                tools_called = self._last_turn_tools.pop(chat_id, [])
-                try:
-                    from lq.hooks import hooks
-                    asyncio.create_task(hooks.trigger(
-                        "on_reply",
-                        chat_id=chat_id,
-                        user_text=queued_text,
-                        reply_text=reply_text,
-                        tools_called=tools_called,
-                        adapter=self.adapter,
-                        sender_name=last_sender_name,
-                    ))
-                except Exception:
-                    logger.exception("on_reply 钩子触发失败")
+            # on_reply post-turn hook removed (hooks.py deleted)
 
         except Exception:
             logger.exception("排空暂存消息整体失败 (chat=%s), %d 条消息丢失", chat_id, count)
