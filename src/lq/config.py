@@ -170,7 +170,7 @@ class LQConfig:
         cfg = cls.__new__(cls)
         cfg.name = d.get("name", "lingque")
         cfg.slug = d.get("slug", "")
-        cfg.model = d.get("model", "glm-5")
+        cfg.model = d.get("model", "")
         cfg.heartbeat_interval = d.get("heartbeat_interval", 3600)
         cfg.cost_alert_daily = d.get("cost_alert_daily", 5.0)
         cfg.curiosity_budget = d.get("curiosity_budget", 1.0)
@@ -320,6 +320,7 @@ def load_from_env(env_path: Path) -> LQConfig:
     )
     cfg.api.base_url = vals.get("ANTHROPIC_BASE_URL", cfg.api.base_url)
     cfg.api.api_format = vals.get("API_FORMAT", "anthropic")
+    cfg.model = vals.get("MODEL", "") or cfg.model
     cfg.api.proxy = (
         vals.get("HTTPS_PROXY")
         or vals.get("HTTP_PROXY")

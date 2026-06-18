@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import sys
 import time
 from typing import Any
 
@@ -20,12 +21,16 @@ class RuntimeToolsMixin:
 
     async def _tool_run_python(self, code: str, timeout: int = 30) -> dict:
         """在子进程中执行 Python 代码"""
+        import os as _os
+        env = _os.environ.copy()
+        env["PYTHONUTF8"] = "1"  # 子进程统一用 UTF-8，避免中文路径/内容乱码
         try:
             proc = await asyncio.create_subprocess_exec(
-                "python3", "-c", code,
+                sys.executable, "-Xutf8", "-c", code,
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE,
                 cwd=str(self.memory.workspace),
+                env=env,
             )
 
             stdout, stderr = await asyncio.wait_for(
@@ -116,14 +121,17 @@ class RuntimeToolsMixin:
 
     # ── 文件操作 ──
 
+    def _resolve_file_path(self, path: str):
+        from pathlib import Path as _Path
+        file_path = _Path(path)
+        if not file_path.is_absolute():
+            base = self.memory.project_workspace or self.memory.workspace
+            file_path = base / file_path
+        return file_path
+
     def _tool_read_file(self, path: str, max_lines: int = 500) -> dict:
         """读取文件系统中的文件"""
-        from pathlib import Path as _Path
-
-        file_path = _Path(path)
-        # 相对路径基于工作区
-        if not file_path.is_absolute():
-            file_path = self.memory.workspace / file_path
+        file_path = self._resolve_file_path(path)
 
         if not file_path.exists():
             return {"success": False, "error": ERR_FILE_NOT_FOUND.format(path=str(file_path))}
@@ -161,12 +169,7 @@ class RuntimeToolsMixin:
 
     def _tool_write_file(self, path: str, content: str) -> dict:
         """写入文件到文件系统"""
-        from pathlib import Path as _Path
-
-        file_path = _Path(path)
-        # 相对路径基于工作区
-        if not file_path.is_absolute():
-            file_path = self.memory.workspace / file_path
+        file_path = self._resolve_file_path(path)
 
         try:
             # 自动创建父目录
@@ -180,3 +183,33 @@ class RuntimeToolsMixin:
             }
         except Exception as e:
             return {"success": False, "error": ERR_FILE_WRITE_FAILED.format(error=str(e))}
+
+    def _tool_edit_file(self, path: str, old_string: str, new_string: str) -> dict:
+        """替换文件中的精确字符串（必须唯一出现）"""
+        file_path = self._resolve_file_path(path)
+
+        if not file_path.exists():
+            return {"success": False, "error": ERR_FILE_NOT_FOUND.format(path=str(file_path))}
+        if not file_path.is_file():
+            return {"success": False, "error": f"路径不是文件: {file_path}"}
+
+        try:
+            original = file_path.read_text(encoding="utf-8")
+            count = original.count(old_string)
+            if count == 0:
+                return {"success": False, "error": f"未在文件中找到指定内容，请确认 old_string 与文件完全一致（包含空格和换行）"}
+            if count > 1:
+                return {"success": False, "error": f"old_string 在文件中出现了 {count} 次，无法安全替换，请提供更多上下文使其唯一"}
+
+            updated = original.replace(old_string, new_string, 1)
+            old_lines = len(original.splitlines())
+            new_lines = len(updated.splitlines())
+            file_path.write_text(updated, encoding="utf-8")
+            logger.info("edit_file: %s (行数 %d → %d)", file_path, old_lines, new_lines)
+            return {
+                "success": True,
+                "path": str(file_path),
+                "lines_changed": abs(new_lines - old_lines),
+            }
+        except Exception as e:
+            return {"success": False, "error": f"编辑文件失败: {e}"}
