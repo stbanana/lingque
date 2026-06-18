@@ -291,7 +291,12 @@ def _print_card(name: str, card_json: dict) -> None:
         print(f"  {color}{emoji} {content}{reset}")
 
 
-async def run_conversation(home: Path, config: LQConfig, single_message: str = "") -> None:
+async def run_conversation(
+    home: Path,
+    config: LQConfig,
+    single_message: str = "",
+    project_workspace: Path | None = None,
+) -> None:
     """运行本地交互式对话。
 
     走标准事件流：用户输入 → IncomingMessage → router.handle() → _handle_private
@@ -302,6 +307,7 @@ async def run_conversation(home: Path, config: LQConfig, single_message: str = "
         home: 实例工作目录
         config: 实例配置
         single_message: 如果非空，发送单条消息后退出（非交互模式）
+        project_workspace: 当前代码项目目录（lq chat 时自动传入 cwd）
     """
     # 将 config 中的代理设置注入环境变量
     if config.api.proxy:
@@ -328,7 +334,7 @@ async def run_conversation(home: Path, config: LQConfig, single_message: str = "
     queue: asyncio.Queue = asyncio.Queue()
     await adapter.connect(queue)
 
-    memory = MemoryManager(home, config=config)
+    memory = MemoryManager(home, config=config, project_workspace=project_workspace)
     executor = create_executor(config.api, config.model)
     stats = StatsTracker(home)
     executor.stats = stats

@@ -433,6 +433,28 @@ TOOLS: list[dict] = [
         },
     },
     {
+        "name": "edit_file",
+        "description": "替换文件中的指定字符串（精确匹配，必须唯一）。适用于修改已有文件的局部内容，比整体 write_file 更安全。",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "path": {
+                    "type": "string",
+                    "description": "文件路径（相对于项目工作区或绝对路径）",
+                },
+                "old_string": {
+                    "type": "string",
+                    "description": "要替换的原始内容，必须在文件中恰好出现一次",
+                },
+                "new_string": {
+                    "type": "string",
+                    "description": "替换后的新内容",
+                },
+            },
+            "required": ["path", "old_string", "new_string"],
+        },
+    },
+    {
         "name": "browser_action",
         "description": TOOL_DESC_BROWSER_ACTION,
         "input_schema": {

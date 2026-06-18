@@ -276,6 +276,13 @@ class ToolExecMixin:
                     input_data["content"],
                 )
 
+            elif name == "edit_file":
+                return self._tool_edit_file(
+                    input_data["path"],
+                    input_data["old_string"],
+                    input_data["new_string"],
+                )
+
             elif name == "get_my_stats":
                 return self._tool_get_my_stats(
                     input_data.get("category", "today"),

@@ -399,7 +399,7 @@ def logs(instance: str, since: str | None) -> None:
         subprocess.run(["tail", "-f", str(log_file)])
 
 
-def _run_local_chat(instance: str, message: str) -> None:
+def _run_local_chat(instance: str, message: str, project_workspace: Path | None = None) -> None:
     """共用逻辑：本地对话（chat / say 共享）"""
     home, display, cfg = _resolve(instance)
 
@@ -410,33 +410,39 @@ def _run_local_chat(instance: str, message: str) -> None:
     config = cfg or load_config(home)
 
     from lq.conversation import run_conversation
-    asyncio.run(run_conversation(home, config, single_message=message))
+    asyncio.run(run_conversation(home, config, single_message=message,
+                                 project_workspace=project_workspace))
 
 
 @cli.command()
 @click.argument("instance")
 @click.argument("message", required=False, default="")
-def chat(instance: str, message: str) -> None:
+@click.option("--workspace", type=click.Path(exists=True, file_okay=False), default=None,
+              help="项目工作区路径（默认为当前目录）")
+def chat(instance: str, message: str, workspace: str | None) -> None:
     """和灵雀聊天（本地终端，不依赖飞书）
 
     \b
     交互模式:  lq chat @name
     单条模式:  lq chat @name "你好"
+    工作区:    lq chat @name --workspace /path/to/project
     """
-    _run_local_chat(instance, message)
+    _run_local_chat(instance, message, project_workspace=Path(workspace) if workspace else Path.cwd())
 
 
 @cli.command()
 @click.argument("instance")
 @click.argument("message", required=False, default="")
-def say(instance: str, message: str) -> None:
+@click.option("--workspace", type=click.Path(exists=True, file_okay=False), default=None,
+              help="项目工作区路径（默认为当前目录）")
+def say(instance: str, message: str, workspace: str | None) -> None:
     """chat 的别名 — 和灵雀对话
 
     \b
     交互模式:  lq say @name
     单条模式:  lq say @name "你好"
     """
-    _run_local_chat(instance, message)
+    _run_local_chat(instance, message, project_workspace=Path(workspace) if workspace else Path.cwd())
 
 
 @cli.command()

@@ -49,10 +49,12 @@ class MemoryManager:
         workspace: Path,
         stats_provider: Callable[[], dict] | None = None,
         config: LQConfig | None = None,
+        project_workspace: Path | None = None,
     ) -> None:
         self.workspace = workspace
         self.stats_provider = stats_provider
         self.config = config
+        self.project_workspace = project_workspace
         self.memory_dir = workspace / "memory"
         self.memory_dir.mkdir(parents=True, exist_ok=True)
         self.chat_memories_dir = workspace / "chat_memories"
@@ -316,7 +318,54 @@ class MemoryManager:
             except Exception:
                 pass
 
+        # 项目工作区文件树（lq chat 模式）
+        if self.project_workspace and self.project_workspace.is_dir():
+            tree = self._build_file_tree(self.project_workspace)
+            awareness_content += (
+                f"\n### 当前项目工作区\n"
+                f"Path: {self.project_workspace}\n"
+                f"<file_tree>\n{tree}\n</file_tree>\n"
+            )
+
         return wrap_tag(TAG_SELF_AWARENESS, awareness_content)
+
+    _FILE_TREE_IGNORE = {
+        ".git", "__pycache__", ".venv", "venv", "node_modules",
+        "dist", "build", ".tox", ".mypy_cache", ".pytest_cache",
+    }
+    _FILE_TREE_IGNORE_SUFFIXES = {".pyc", ".pyo", ".o", ".a", ".so", ".elf", ".bin", ".hex"}
+
+    def _build_file_tree(self, root: Path, max_depth: int = 5, max_entries: int = 200) -> str:
+        """生成目录树字符串，忽略构建产物和隐藏目录。"""
+        lines: list[str] = [root.name + "/"]
+        count = [0]
+
+        def _walk(path: Path, prefix: str, depth: int) -> None:
+            if depth > max_depth or count[0] >= max_entries:
+                return
+            try:
+                entries = sorted(path.iterdir(), key=lambda p: (p.is_file(), p.name.lower()))
+            except PermissionError:
+                return
+            dirs = [e for e in entries if e.is_dir() and e.name not in self._FILE_TREE_IGNORE and not e.name.startswith(".")]
+            files = [e for e in entries if e.is_file() and e.suffix not in self._FILE_TREE_IGNORE_SUFFIXES]
+            all_entries = dirs + files
+            for i, entry in enumerate(all_entries):
+                if count[0] >= max_entries:
+                    lines.append(prefix + "└── ...")
+                    return
+                connector = "└── " if i == len(all_entries) - 1 else "├── "
+                if entry.is_dir():
+                    lines.append(prefix + connector + entry.name + "/")
+                    count[0] += 1
+                    extension = "    " if i == len(all_entries) - 1 else "│   "
+                    _walk(entry, prefix + extension, depth + 1)
+                else:
+                    lines.append(prefix + connector + entry.name)
+                    count[0] += 1
+
+        _walk(root, "", 1)
+        return "\n".join(lines)
 
     def _build_custom_tools_awareness(self) -> str:
         """构建自定义工具的自我认知段落。"""
